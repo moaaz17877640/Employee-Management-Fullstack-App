@@ -221,7 +221,7 @@ pipeline {
                 sh """
                     cd ansible
                     ansible loadbalancer -i inventory -m shell \
-                        -a "curl -sf http://localhost/api/employees" \
+                        -a "curl -sf http://localhost:8080/api/employees" \
                         --timeout=60
                 """
                 echo "✅ Load balancer routing verified"

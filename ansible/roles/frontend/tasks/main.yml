@@ -1,0 +1,80 @@
+---
+# Frontend Role - Main Tasks
+- name: Install Node.js 18.x
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    apt-get install -y nodejs
+
+- name: Remove existing frontend directories
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /opt/frontend
+    - /opt/frontend-repo
+
+- name: Create frontend directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: ubuntu
+    group: ubuntu
+  loop:
+    - /opt/frontend
+    - /var/www/html
+
+- name: Clone frontend repository
+  git:
+    repo: "{{ github_repo }}"
+    dest: /opt/frontend-repo
+    version: "{{ repo_branch }}"
+    force: yes
+    depth: 1
+
+- name: Copy frontend source to build directory
+  shell: |
+    rm -rf /opt/frontend
+    cp -r /opt/frontend-repo/frontend /opt/frontend
+    chown -R ubuntu:ubuntu /opt/frontend
+
+- name: Update API URLs in frontend services
+  replace:
+    path: "{{ item }}"
+    regexp: 'https://employee-management-app-gdm5\.onrender\.com'
+    replace: 'http://{{ ansible_host }}'
+  loop:
+    - /opt/frontend/src/services/employeeService.js
+    - /opt/frontend/src/services/departmentService.js
+
+- name: Install frontend dependencies
+  npm:
+    path: /opt/frontend
+    state: present
+  environment:
+    NODE_OPTIONS: "--max-old-space-size=1024"
+  become_user: ubuntu
+
+- name: Build React frontend
+  command: npm run build
+  args:
+    chdir: /opt/frontend
+  environment:
+    NODE_OPTIONS: "--max-old-space-size=1024"
+    CI: "false"
+  become_user: ubuntu
+
+- name: Deploy built React app
+  shell: |
+    rm -rf /var/www/html/*
+    cp -r /opt/frontend/build/* /var/www/html/
+    chown -R www-data:www-data /var/www/html
+
+- name: Clean up temporary files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/npm-*
+    - /opt/frontend/node_modules/.cache
+  ignore_errors: yes

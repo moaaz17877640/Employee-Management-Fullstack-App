@@ -1,0 +1,115 @@
+---
+# Backend Role - Main Tasks
+- name: Install Java 17 and MySQL
+  apt:
+    name: 
+      - openjdk-17-jdk
+      - mysql-server
+      - maven
+      - build-essential
+    state: present
+    update_cache: yes
+
+- name: Start and enable MySQL
+  systemd:
+    name: mysql
+    state: started
+    enabled: yes
+
+- name: Setup MySQL database
+  shell: |
+    mysql -u root -e "CREATE DATABASE IF NOT EXISTS {{ mysql_database }};"
+    mysql -u root -e "CREATE USER IF NOT EXISTS '{{ mysql_user }}'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ mysql_password }}';"
+    mysql -u root -e "GRANT ALL PRIVILEGES ON {{ mysql_database }}.* TO '{{ mysql_user }}'@'localhost';"
+    mysql -u root -e "FLUSH PRIVILEGES;"
+  ignore_errors: yes
+
+- name: Create application directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop:
+    - /opt/employee-management
+    - /var/log/employee-management
+
+- name: Remove existing source directory
+  file:
+    path: /opt/employee-management-src
+    state: absent
+
+- name: Clone backend repository
+  git:
+    repo: "{{ github_repo }}"
+    dest: /opt/employee-management-src
+    version: "{{ repo_branch }}"
+    force: yes
+
+- name: Build backend JAR with Maven
+  command: mvn -B -DskipTests clean package
+  args:
+    chdir: /opt/employee-management-src/backend
+  environment:
+    MAVEN_OPTS: "-Xmx1024m"
+    JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+  register: maven_build_result
+  failed_when: maven_build_result.rc != 0
+
+- name: Copy and configure JAR file
+  shell: |
+    if [ -f /opt/employee-management-src/backend/target/employee-management-app-0.0.1-SNAPSHOT.jar ]; then
+      cp /opt/employee-management-src/backend/target/employee-management-app-0.0.1-SNAPSHOT.jar /opt/employee-management/employee-management-app.jar
+      chmod +x /opt/employee-management/employee-management-app.jar
+      echo "Maven-built JAR copied and configured"
+    else
+      echo "ERROR: Maven build failed - JAR not found"
+      ls -la /opt/employee-management-src/backend/target/
+      exit 1
+    fi
+  register: jar_setup_result
+
+- name: Create application configuration
+  template:
+    src: application.properties.j2
+    dest: /opt/employee-management/application.properties
+    mode: '0644'
+  notify: restart backend service
+
+- name: Create backend systemd service
+  template:
+    src: employee-backend.service.j2
+    dest: /etc/systemd/system/employee-backend.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart backend service
+
+- name: Setup log rotation
+  template:
+    src: logrotate.j2
+    dest: /etc/logrotate.d/employee-management
+    mode: '0644'
+
+- name: Change log directory ownership
+  file:
+    path: /var/log/employee-management
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+    recurse: yes
+
+- name: Start and enable backend service
+  systemd:
+    name: employee-backend
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for backend service to be ready
+  wait_for:
+    port: "{{ backend_port }}"
+    host: "{{ ansible_default_ipv4.address }}"
+    delay: 10
+    timeout: 60

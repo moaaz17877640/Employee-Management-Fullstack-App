@@ -1,0 +1,109 @@
+---
+# Pre-deployment validation playbook to prevent common errors
+# Run this before the main deployment to catch issues early
+
+- name: Pre-deployment System Validation
+  hosts: all
+  gather_facts: yes
+  become: yes
+  
+  tasks:
+    - name: Verify SSH connectivity
+      ping:
+      delegate_to: "{{ inventory_hostname }}"
+      
+    - name: Check system requirements
+      assert:
+        that:
+          - ansible_os_family == "Debian"
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_major_version|int >= 20
+        fail_msg: "System requirements not met. Ubuntu 20+ required."
+        
+    - name: Ensure sufficient disk space (minimum 5GB)
+      assert:
+        that:
+          - ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_available') | first | int > 5368709120
+        fail_msg: "Insufficient disk space. Minimum 5GB required."
+        
+    - name: Ensure sufficient memory (minimum 2GB)
+      assert:
+        that:
+          - ansible_memtotal_mb >= 1900
+        fail_msg: "Insufficient memory. Minimum 2GB RAM required."
+        
+    - name: Check network connectivity
+      uri:
+        url: "https://github.com"
+        method: HEAD
+        timeout: 10
+      ignore_errors: yes
+      register: network_check
+      
+    - name: Verify internet connectivity
+      assert:
+        that:
+          - network_check.status == 200
+        fail_msg: "No internet connectivity. Required for downloading packages."
+
+- name: Validate Backend Server Requirements
+  hosts: backend
+  gather_facts: yes
+  become: yes
+  
+  tasks:
+    - name: Check port 8080 availability
+      wait_for:
+        port: 8080
+        host: "{{ ansible_default_ipv4.address }}"
+        state: stopped
+        timeout: 5
+      ignore_errors: yes
+      register: port_check
+      
+    - name: Ensure port 8080 is free
+      assert:
+        that:
+          - port_check is not failed
+        fail_msg: "Port 8080 is already in use. Stop conflicting services."
+
+- name: Validate Load Balancer Requirements  
+  hosts: loadbalancer
+  gather_facts: yes
+  become: yes
+  
+  tasks:
+    - name: Check port 80 availability
+      wait_for:
+        port: 80
+        host: "{{ ansible_default_ipv4.address }}"
+        state: stopped
+        timeout: 5
+      ignore_errors: yes
+      register: lb_port_check
+      
+    - name: Ensure port 80 is free
+      assert:
+        that:
+          - lb_port_check is not failed
+        fail_msg: "Port 80 is already in use. Stop conflicting web servers."
+        
+    - name: Verify backend connectivity from load balancer
+      wait_for:
+        host: "{{ hostvars[item]['ansible_default_ipv4']['address'] }}"
+        port: 22
+        timeout: 10
+      with_items: "{{ groups['backend'] }}"
+      
+    - name: Display deployment summary
+      debug:
+        msg: |
+          ✅ Pre-deployment validation completed successfully!
+          
+          Load Balancer: {{ ansible_default_ipv4.address }}
+          Backend Servers: 
+          {% for host in groups['backend'] %}
+          - {{ hostvars[host]['ansible_default_ipv4']['address'] }}
+          {% endfor %}
+          
+          Ready for main deployment.

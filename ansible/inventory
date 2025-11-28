@@ -1,0 +1,70 @@
+# Ansible Inventory for Employee Management App - Madaar Solutions
+# DigitalOcean Droplet Configuration
+
+[loadbalancer]
+# Droplet 1 - Load Balancer + Frontend
+droplet1 ansible_host=98.89.37.16 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
+
+[backend]
+# Droplet 2 - Backend Instance #1
+droplet2 ansible_host=34.228.254.14 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
+# Droplet 3 - Backend Instance #2  
+droplet3 ansible_host=54.221.75.80 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
+
+[all:vars]
+# Global variables
+ansible_python_interpreter=/usr/bin/python3
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ConnectionAttempts=3'
+ansible_timeout=60
+# Error prevention settings
+host_key_checking=False
+gather_facts=yes
+fact_caching=memory
+fact_caching_timeout=86400
+
+# Application variables
+app_name=employee-management
+app_version=latest
+app_port=8080
+java_version=17
+# Service reliability settings
+service_startup_delay=30
+health_check_retries=5
+health_check_delay=10
+
+# Database configuration
+db_host=YOUR_DATABASE_HOST
+db_name=employee_management
+db_user=employee_user
+db_password=YOUR_DB_PASSWORD
+
+# SSL/Domain configuration (Commented out - no domain available)
+# domain_name=emp-mgmt.yourdomain.com
+# ssl_email=admin@yourdomain.com  
+# ssl_type=letsencrypt
+enable_ssl=false
+health_check_interval=30
+
+
+# Backend server endpoints (for load balancer configuration)
+# Use internal IPs for better connectivity and performance
+backend_server1="{{ hostvars['droplet2']['ansible_default_ipv4']['address'] }}:{{ app_port }}"
+backend_server2="{{ hostvars['droplet3']['ansible_default_ipv4']['address'] }}:{{ app_port }}"
+# Fallback to public IPs if internal not available
+backend_server1_fallback="{{ hostvars['droplet2']['ansible_host'] }}:{{ app_port }}"
+backend_server2_fallback="{{ hostvars['droplet3']['ansible_host'] }}:{{ app_port }}"
+
+[loadbalancer:vars]
+# Load balancer specific variables
+nginx_worker_processes=auto
+nginx_worker_connections=1024
+ssl_certificate_path=/etc/letsencrypt/live
+react_build_path=/var/www/html/employee-management
+
+[backend:vars]
+# Backend specific variables
+java_home=/usr/lib/jvm/java-17-openjdk-amd64
+app_jar_path=/opt/employee-management
+app_config_path=/etc/employee-management
+log_path=/var/log/employee-management
+systemd_service_name=employee-management

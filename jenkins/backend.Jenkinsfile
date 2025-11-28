@@ -9,6 +9,11 @@ pipeline {
         GIT_REPO = '/home/moaz/test/Employee-Management-Fullstack-App'
         MAVEN_OPTS = '-Dmaven.test.failure.ignore=false'
         
+        // System tool paths
+        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
+        MAVEN_HOME = '/usr/share/maven'
+        PATH = "/usr/bin:${env.PATH}"
+        
         // Ansible Configuration for new deployment system
         ANSIBLE_INVENTORY = '../test/ansible/inventory'
         ANSIBLE_PLAYBOOK_DIR = '../test/ansible'
@@ -22,11 +27,6 @@ pipeline {
         DB_PASSWORD = 'emppass123'
         ANSIBLE_STDOUT_CALLBACK = 'yaml'
         ANSIBLE_FORCE_COLOR = 'true'
-    }
-    
-    tools {
-        maven 'maven'
-        jdk 'java'
     }
     
     options {

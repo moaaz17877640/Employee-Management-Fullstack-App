@@ -71,11 +71,20 @@ pipeline {
                         node --version
                         npm --version
                         
-                        # Clean install
+                        # Clean install - remove old dependencies
                         rm -rf node_modules package-lock.json
                         
-                        # Install dependencies
+                        # Clear npm cache to avoid stale dependencies
+                        npm cache clean --force
+                        
+                        # Install ajv first to resolve dependency conflict
+                        npm install ajv@8.12.0 --legacy-peer-deps
+                        
+                        # Install all dependencies
                         npm install --legacy-peer-deps
+                        
+                        # Verify ajv installation
+                        ls -la node_modules/ajv/
                     '''
                 }
             }

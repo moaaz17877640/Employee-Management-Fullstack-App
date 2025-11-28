@@ -85,7 +85,7 @@
         
     - name: Verify backend connectivity from load balancer
       wait_for:
-        host: "{{ hostvars[item]['ansible_default_ipv4']['address'] }}"
+        host: "{{ hostvars[item]['ansible_host'] }}"
         port: 22
         timeout: 10
       with_items: "{{ groups['backend'] }}"
@@ -98,7 +98,7 @@
           Load Balancer: {{ ansible_default_ipv4.address }}
           Backend Servers: 
           {% for host in groups['backend'] %}
-          - {{ hostvars[host]['ansible_default_ipv4']['address'] }}
+          - {{ hostvars[host]['ansible_host'] }}
           {% endfor %}
           
           Ready for main deployment.

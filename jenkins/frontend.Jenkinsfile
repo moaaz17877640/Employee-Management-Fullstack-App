@@ -91,8 +91,8 @@ pipeline {
                         
                         # Test backend API connectivity
                         echo "🏥 Testing backend server API endpoints..."
-                        ansible backend -i inventory -m uri \\
-                            -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET timeout=30" \\
+                        ansible backend -i inventory -m shell \\
+                            -a "curl -f -s http://localhost:8080/api/employees || exit 1" \\
                             --timeout=60 || {
                                 echo "❌ Backend API not responding - may need backend deployment first"
                                 echo "🔄 Attempting to restart backend services..."
@@ -102,8 +102,8 @@ pipeline {
                                 sleep 30
                                 
                                 # Retry API test
-                                ansible backend -i inventory -m uri \\
-                                    -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET timeout=30" \\
+                                ansible backend -i inventory -m shell \\
+                                    -a "curl -f -s http://localhost:8080/api/employees || exit 1" \\
                                     --timeout=60 || {
                                         echo "⚠️ Backend API still not responding - frontend will deploy but API routing may fail"
                                         echo "💡 Recommendation: Run backend pipeline first"
@@ -159,14 +159,14 @@ pipeline {
                         echo "🔍 Running comprehensive frontend validation..."
                         
                         # Test frontend availability
-                        ansible loadbalancer -i inventory -m uri \\
-                            -a "url=http://{{ ansible_default_ipv4.address }}/ method=GET status_code=200 timeout=30" \\
+                        ansible loadbalancer -i inventory -m shell \\
+                            -a "curl -f -s http://localhost/ || exit 1" \\
                             --timeout=60
                         
                         # Test API routing through load balancer
                         echo "🔗 Testing API routing through load balancer..."
-                        ansible loadbalancer -i inventory -m uri \\
-                            -a "url=http://{{ ansible_default_ipv4.address }}/api/employees method=GET status_code=200 timeout=30" \\
+                        ansible loadbalancer -i inventory -m shell \\
+                            -a "curl -f -s http://localhost/api/employees || exit 1" \\
                             --timeout=60
                         
                         # Verify Nginx configuration

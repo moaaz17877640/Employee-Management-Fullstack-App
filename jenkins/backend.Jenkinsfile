@@ -25,7 +25,6 @@ pipeline {
         DB_NAME = 'employee_management'
         DB_USER = 'empapp'
         DB_PASSWORD = 'emppass123'
-        ANSIBLE_STDOUT_CALLBACK = 'yaml'
         ANSIBLE_FORCE_COLOR = 'true'
     }
     

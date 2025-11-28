@@ -76,8 +76,8 @@
 - name: Change log directory ownership
   file:
     path: /var/log/employee-management
-    owner: ubuntu
-    group: ubuntu
+    owner: root
+    group: root
     mode: '0755'
     recurse: yes
 

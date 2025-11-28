@@ -18,8 +18,8 @@
     path: "{{ item }}"
     state: directory
     mode: '0755'
-    owner: ubuntu
-    group: ubuntu
+    owner: root
+    group: root
   loop:
     - /opt/frontend
     - /var/www/html
@@ -36,7 +36,7 @@
   shell: |
     rm -rf /opt/frontend
     cp -r /opt/frontend-repo/frontend /opt/frontend
-    chown -R ubuntu:ubuntu /opt/frontend
+    chown -R root:root /opt/frontend
 
 - name: Update API URLs in frontend services
   replace:
@@ -57,7 +57,6 @@
     chdir: /opt/frontend
   environment:
     NODE_OPTIONS: "--max-old-space-size=1024"
-  become_user: ubuntu
 
 - name: Build React frontend
   command: npm run build
@@ -66,7 +65,6 @@
   environment:
     NODE_OPTIONS: "--max-old-space-size=1024"
     CI: "false"
-  become_user: ubuntu
 
 - name: Deploy built React app
   shell: |

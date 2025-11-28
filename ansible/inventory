@@ -3,20 +3,20 @@
 
 [loadbalancer]
 # Droplet 1 - Load Balancer + Frontend
-droplet1 ansible_host=165.232.112.136 ansible_user=root
+droplet1 ansible_host=165.232.112.136 ansible_user=root ansible_password=4Dun8YzW01DU
 
 [backend]
 # Droplet 2 - Backend Instance #1
-droplet2 ansible_host=138.68.90.46 ansible_user=root
+droplet2 ansible_host=138.68.90.46 ansible_user=root ansible_password=SehFaNG7dOxUnr
 # Droplet 3 - Backend Instance #2  
-droplet3 ansible_host=206.189.61.18 ansible_user=root
+droplet3 ansible_host=206.189.61.18 ansible_user=root ansible_password=SehFaNG7dOxUnr
 
 [all:vars]
 # Global variables
 ansible_python_interpreter=/usr/bin/python3
 ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ConnectionAttempts=3'
 ansible_timeout=60
-# Password authentication - password injected from Jenkins credentials
+# Password authentication settings
 ansible_connection=ssh
 # Error prevention settings
 host_key_checking=False

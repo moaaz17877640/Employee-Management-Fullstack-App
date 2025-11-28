@@ -1,21 +1,5 @@
 #!/usr/bin/env groovy
 
-/**
- * Backend CI/CD Pipeline for Employee Management Application
- * 
- * Project: Employee Management Fullstack App – DevOps CI/CD & Deployment
- * Tech Stack: Spring Boot (Backend), MySQL
- * DevOps Tools: Ansible, Jenkins, Nginx
- * 
- * Pipeline Stages (as per project requirements):
- * 1. Checkout repository
- * 2. Build using Maven and migrate new changes on DB models
- * 3. Run tests
- * 4. Package JAR
- * 5. (Optional) Build Docker image
- * 6. Deploy to both backend servers using Ansible
- * 7. Enable zero-downtime deploy (rolling restart)
- */
 
 pipeline {
     agent any
@@ -161,10 +145,10 @@ pipeline {
                 sh "chmod 400 ${SSH_KEY_PATH}"
                 
                 script {
-                    // Ensure the JAR is in the expected location for Ansible
+                    // Verify the JAR exists (it's already in backend/target/ from Package stage)
                     sh """
-                        mkdir -p backend/target
-                        cp ${env.JAR_FILE} backend/target/employee-management-app-0.0.1-SNAPSHOT.jar
+                        echo "Checking JAR file..."
+                        ls -la backend/target/*.jar
                     """
                     
                     // Rolling Deployment: Server 1 first, then Server 2
@@ -173,9 +157,9 @@ pipeline {
                     echo "📦 [1/2] Deploying to Backend Server 1 (Droplet 2)..."
                     sh """
                         cd ansible
-                        ansible-playbook -i inventory roles-playbook.yml \
-                            --limit droplet2 \
-                            --extra-vars "app_version=${env.APP_VERSION}" \
+                        ansible-playbook -i inventory roles-playbook.yml \\
+                            --limit droplet2 \\
+                            --extra-vars "app_version=${env.APP_VERSION}" \\
                             -v
                     """
                     

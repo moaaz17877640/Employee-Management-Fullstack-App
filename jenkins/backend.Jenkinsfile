@@ -264,37 +264,43 @@ pipeline {
     }
     
     post {
-        always {
-            echo "🧹 Cleaning up workspace"
-            cleanWs()
-        }
-        
         success {
             echo "✅ Backend CI/CD pipeline completed successfully!"
             script {
-                // Tag successful deployment
-                sh """
-                    cd ansible
-                    echo "Deployment ${env.APP_VERSION} successful at \$(date)" >> deployment.log
-                """
+                try {
+                    if (fileExists('ansible/inventory')) {
+                        dir('ansible') {
+                            echo "🎯 Deployment completed successfully!"
+                            echo "Deployment ${env.APP_VERSION} successful at \$(date)" >> deployment.log
+                        }
+                    } else {
+                        echo "📝 Build completed successfully - no deployment logs in build-only mode"
+                    }
+                } catch (Exception e) {
+                    echo "⚠️ Post-deployment logging failed: ${e.getMessage()}"
+                }
             }
         }
         
         failure {
             echo "❌ Backend CI/CD pipeline failed!"
             script {
-                // Attempt rollback on deployment failure for master branch
                 if (env.BRANCH_NAME == 'master') {
                     try {
-                        sh """
-                            cd ansible
-                            echo "🔄 Attempting rollback due to pipeline failure..."
-                            ansible-playbook -i inventory site.yml \\
-                                --tags "rollback,backend" \\
-                                --extra-vars "rollback_version=previous" \\
-                                --limit backend \\
-                                --timeout 180 || echo "Rollback failed - manual intervention required"
-                        """
+                        if (fileExists('ansible/inventory')) {
+                            dir('ansible') {
+                                echo "🔄 Attempting rollback due to pipeline failure..."
+                                sh """
+                                    ansible-playbook -i inventory site.yml \\
+                                        --tags "rollback,backend" \\
+                                        --extra-vars "rollback_version=previous" \\
+                                        --limit backend \\
+                                        --timeout 180 || echo "Rollback failed - manual intervention required"
+                                """
+                            }
+                        } else {
+                            echo "📝 Build failed - no deployment rollback needed in build-only mode"
+                        }
                     } catch (Exception e) {
                         echo "⚠️ Automated rollback failed: ${e.getMessage()}"
                         echo "Manual intervention required for service recovery"
@@ -306,5 +312,11 @@ pipeline {
         unstable {
             echo "⚠️ Pipeline completed with warnings"
         }
+        
+        always {
+            echo "🧹 Cleaning up workspace"
+            cleanWs()
+        }
+    }
     }
 }

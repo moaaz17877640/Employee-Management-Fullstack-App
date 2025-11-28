@@ -12,7 +12,8 @@ pipeline {
         REACT_APP_ENVIRONMENT = 'production'
         
         // System tool paths
-        PATH = "/usr/bin:${env.PATH}"
+        NODE_HOME = '/usr/local/nodejs'
+        PATH = "/usr/bin:/usr/local/bin:${env.PATH}"
         
         // Ansible Configuration
         ANSIBLE_INVENTORY = 'ansible/inventory'
@@ -45,11 +46,35 @@ pipeline {
             }
         }
         
+        stage('Setup Node.js Environment') {
+            steps {
+                echo "⚙️ Setting up Node.js environment"
+                script {
+                    sh '''
+                        # Verify Node.js and npm versions
+                        node --version || echo "Node.js not found - using system default"
+                        npm --version || echo "npm not found - using system default"
+                        
+                        # Clear npm cache to prevent cache issues
+                        npm cache clean --force || echo "Cache clean failed, continuing..."
+                    '''
+                }
+            }
+        }
+        
         stage('Install Dependencies') {
             steps {
                 dir('frontend') {
                     echo "📦 Installing npm dependencies"
-                    sh 'npm ci'
+                    script {
+                        sh '''
+                            # Remove existing node_modules and package-lock to ensure fresh install
+                            rm -rf node_modules package-lock.json
+                            
+                            # Install dependencies with error handling
+                            npm install --legacy-peer-deps --timeout=300000
+                        '''
+                    }
                 }
             }
         }

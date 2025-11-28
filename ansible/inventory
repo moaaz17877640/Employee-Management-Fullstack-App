@@ -26,7 +26,7 @@ fact_caching_timeout=86400
 app_name=employee-management
 app_version=latest
 app_port=8080
-java_version=17
+java_version=21
 # Service reliability settings
 service_startup_delay=30
 health_check_retries=5
@@ -63,7 +63,7 @@ react_build_path=/var/www/html/employee-management
 
 [backend:vars]
 # Backend specific variables
-java_home=/usr/lib/jvm/java-17-openjdk-amd64
+java_home=/usr/lib/jvm/java-21-openjdk-amd64
 app_jar_path=/opt/employee-management
 app_config_path=/etc/employee-management
 log_path=/var/log/employee-management

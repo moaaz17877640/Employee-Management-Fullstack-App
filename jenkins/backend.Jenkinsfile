@@ -12,7 +12,7 @@ pipeline {
         // System tool paths
         JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
         MAVEN_HOME = '/usr/share/maven'
-        PATH = "/usr/bin:${env.PATH}"
+        PATH = "/usr/bin:${env.PATH}:${JAVA_HOME}/bin"
         
         // Ansible Configuration for new deployment system
         ANSIBLE_INVENTORY = 'ansible/inventory'
@@ -26,6 +26,15 @@ pipeline {
         DB_USER = 'empapp'
         DB_PASSWORD = 'emppass123'
         ANSIBLE_FORCE_COLOR = 'true'
+        
+        // Application Environment Variables
+        MYSQL_HOST = 'localhost'
+        MYSQL_PORT = '3306'
+        MYSQL_DB = 'employee_management'
+        MYSQL_USER = 'empapp'
+        MYSQL_PASSWORD = 'emppass123'
+        MYSQL_SSL_MODE = 'DISABLED'
+        MONGO_URI = 'mongodb://localhost:27017/employee_management'
     }
     
     options {
@@ -48,6 +57,29 @@ pipeline {
                         ]]
                     ])
                     sh 'pwd && ls -la'
+                }
+            }
+        }
+        
+        stage('Setup Environment Configuration') {
+            steps {
+                dir('backend') {
+                    echo "⚙️ Setting up application configuration"
+                    script {
+                        // Create config.properties file with environment variables
+                        writeFile(
+                            file: 'config.properties',
+                            text: """
+                                MYSQL_HOST=${env.MYSQL_HOST}
+                                MYSQL_PORT=${env.MYSQL_PORT}
+                                MYSQL_DB=${env.MYSQL_DB}
+                                MYSQL_USER=${env.MYSQL_USER}
+                                MYSQL_PASSWORD=${env.MYSQL_PASSWORD}
+                                MYSQL_SSL_MODE=${env.MYSQL_SSL_MODE}
+                                MONGO_URI=${env.MONGO_URI}
+                            """.stripIndent()
+                        )
+                    }
                 }
             }
         }

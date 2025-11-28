@@ -1,5 +1,6 @@
 #!/usr/bin/env groovy
 
+// Pipeline Version: 2.0 - Fixed JAR path issue
 
 pipeline {
     agent any

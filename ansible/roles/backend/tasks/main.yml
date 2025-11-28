@@ -43,9 +43,9 @@
     path: /opt/employee-management-src
     state: absent
 
-- name: Copy pre-built JAR file from local machine
+- name: Copy pre-built JAR file from Jenkins workspace
   copy:
-    src: ../backend/target/employee-management-app-0.0.1-SNAPSHOT.jar
+    src: "{{ playbook_dir }}/../backend/target/employee-management-app-0.0.1-SNAPSHOT.jar"
     dest: /opt/employee-management/employee-management-app.jar
     mode: '0755'
     owner: root

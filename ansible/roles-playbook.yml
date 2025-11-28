@@ -21,7 +21,7 @@
     mysql_password: "emppass123"
     
     # GitHub repository settings
-    github_repo: "https://github.com/hoangsonww/Employee-Management-Fullstack-App.git"
+    github_repo: "https://github.com/moaaz17877640/Employee-Management-Fullstack-App.git"
     repo_branch: "master"
     
     # SSL/Security settings (disabled for IP-based access)
@@ -65,7 +65,7 @@
     mysql_password: "emppass123"
     
     # GitHub repository settings
-    github_repo: "https://github.com/hoangsonww/Employee-Management-Fullstack-App.git"
+    github_repo: "https://github.com/moaaz17877640/Employee-Management-Fullstack-App.git"
     repo_branch: "master"
     
     # SSL/Security settings (disabled for IP-based access)
@@ -93,7 +93,7 @@
     mysql_password: "emppass123"
     
     # GitHub repository settings
-    github_repo: "https://github.com/hoangsonww/Employee-Management-Fullstack-App.git"
+    github_repo: "https://github.com/moaaz17877640/Employee-Management-Fullstack-App.git"
     repo_branch: "master"
     
     # SSL/Security settings (disabled for IP-based access)

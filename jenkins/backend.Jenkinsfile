@@ -6,7 +6,7 @@ pipeline {
     environment {
         APP_NAME = 'employee-management'
         APP_VERSION = "${env.BUILD_NUMBER}"
-        GIT_REPO = '/home/moaz/test/Employee-Management-Fullstack-App'
+        GIT_REPO = 'https://github.com/moaaz17877640/Employee-Management-Fullstack-App.git'
         MAVEN_OPTS = '-Dmaven.test.failure.ignore=false'
         
         // System tool paths
@@ -36,9 +36,17 @@ pipeline {
     stages {
         stage('Checkout Repository') {
             steps {
-                echo "🔄 Using local repository at ${env.GIT_REPO}"
+                echo "🔄 Cloning repository from ${env.GIT_REPO}"
                 script {
-                    // We're already in the correct directory
+                    // Clean workspace and clone fresh
+                    deleteDir()
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/master']],
+                        userRemoteConfigs: [[
+                            url: env.GIT_REPO
+                        ]]
+                    ])
                     sh 'pwd && ls -la'
                 }
             }

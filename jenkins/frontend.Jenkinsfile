@@ -65,12 +65,15 @@ pipeline {
                     sh 'npm run build'
                     sh 'ls -la build/'
                     
-                    // Archive build artifacts
-                    tar(
-                        file: "frontend-build-${env.BUILD_NUMBER}.tar.gz",
-                        archive: true,
-                        dir: 'build'
-                    )
+                    // Archive build artifacts using shell commands and archiveArtifacts
+                    script {
+                        sh "tar -czf frontend-build-${env.BUILD_NUMBER}.tar.gz -C build ."
+                        archiveArtifacts(
+                            artifacts: "frontend-build-${env.BUILD_NUMBER}.tar.gz",
+                            fingerprint: true,
+                            allowEmptyArchive: false
+                        )
+                    }
                 }
             }
         }

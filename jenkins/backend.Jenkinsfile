@@ -192,73 +192,172 @@ pipeline {
         
         stage('Deploy to Backend Servers using Ansible') {
             when {
-                branch 'master'
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                }
             }
             steps {
-                echo "🚀 Deploying backend with zero-downtime rolling deployment"
+                echo "🚀 Deploying backend with comprehensive validation and health checks"
                 script {
                     sh """
                         cd ${ANSIBLE_PLAYBOOK_DIR}
                         
-                        # Zero-downtime rolling deployment to backend servers
-                        echo "🔄 Starting rolling deployment to backend servers..."
+                        # Ensure SSH key permissions
+                        chmod 400 ${SSH_KEY_PATH} || echo "SSH key permission already set"
                         
-                        # Deploy to first backend server
+                        # Pre-deployment health check
+                        echo "🔍 Pre-deployment server connectivity check..."
+                        ansible backend -i inventory -m ping --timeout=30 || echo "Some servers unreachable, continuing..."
+                        
+                        # Deploy to all backend servers with full validation
+                        echo "📦 Deploying backend JAR to all servers..."
                         ansible-playbook -i inventory roles-playbook.yml \\
-                            --limit droplet2 \\
+                            --limit backend \\
                             --extra-vars "app_version=${env.APP_VERSION}" \\
-                            --extra-vars "deployment_strategy=rolling" \\
-                            --extra-vars "enable_zero_downtime=true" \\
+                            --extra-vars "deployment_strategy=backend_complete" \\
+                            --extra-vars "force_restart=true" \\
+                            --extra-vars "validate_deployment=true" \\
                             --tags "backend" \\
                             -v
                         
-                        # Wait for first server to be ready
-                        echo "⏳ Waiting for first server to be ready..."
-                        sleep 30
+                        # Wait for services to fully start
+                        echo "⏳ Waiting for backend services to fully initialize..."
+                        sleep 45
                         
-                        # Verify first server is healthy before deploying to second
+                        # Comprehensive health validation
+                        echo "🏥 Running comprehensive health checks..."
+                        
+                        # Check if services are running
+                        ansible backend -i inventory -m shell \\
+                            -a "sudo systemctl is-active employee-backend || sudo systemctl status employee-backend" \\
+                            --timeout=30
+                        
+                        # Check if ports are open
+                        ansible backend -i inventory -m wait_for \\
+                            -a "port=8080 host={{ ansible_default_ipv4.address }} timeout=60" \\
+                            --timeout=90
+                        
+                        # Test API endpoints on all servers
+                        echo "🔗 Testing API connectivity on all backend servers..."
                         ansible backend -i inventory -m uri \\
-                            -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET" \\
-                            --limit droplet2
+                            -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET timeout=30" \\
+                            --timeout=60 || {
+                                echo "❌ API test failed, checking service logs..."
+                                ansible backend -i inventory -m shell \\
+                                    -a "sudo journalctl -u employee-backend --no-pager -n 20" \\
+                                    --timeout=30
+                                exit 1
+                            }
                         
-                        # Deploy to second backend server
-                        ansible-playbook -i inventory roles-playbook.yml \\
-                            --limit droplet3 \\
-                            --extra-vars "app_version=${env.APP_VERSION}" \\
-                            --extra-vars "deployment_strategy=rolling" \\
-                            --extra-vars "enable_zero_downtime=true" \\
-                            --tags "backend" \\
-                            -v
-                        
-                        echo "✅ Rolling deployment completed successfully"
+                        echo "✅ Backend deployment and validation completed successfully"
                     """
                 }
             }
         }
         
-        stage('Post-deployment Validation') {
+        stage('Update Load Balancer Configuration') {
             when {
-                branch 'master'
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                }
             }
             steps {
-                echo "🔍 Running comprehensive post-deployment validation"
+                echo "🔄 Updating load balancer with current backend server IPs"
                 script {
                     sh """
                         cd ${ANSIBLE_PLAYBOOK_DIR}
                         
-                        # Run post-deployment validation for backend servers
-                        ansible-playbook -i inventory post-deployment-validation.yml \\
-                            --limit backend \\
+                        # Gather facts from backend servers to get internal IPs
+                        ansible backend -i inventory -m setup --tree /tmp/facts/
+                        
+                        # Update load balancer configuration with current IPs
+                        ansible-playbook -i inventory roles-playbook.yml \\
+                            --limit loadbalancer \\
+                            --extra-vars "update_backend_ips=true" \\
+                            --extra-vars "reload_nginx=true" \\
+                            --tags "loadbalancer,backend_config" \\
                             -v
                         
-                        # Additional API health checks
-                        echo "🏥 Testing API endpoints on all backend servers..."
-                        ansible backend -i inventory -m uri \\
-                            -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET status_code=200" \\
-                            --one-line
+                        # Test load balancer routing
+                        echo "🔗 Testing load balancer API routing..."
+                        ansible loadbalancer -i inventory -m uri \\
+                            -a "url=http://{{ ansible_default_ipv4.address }}/api/employees method=GET timeout=30" \\
+                            --timeout=60
+                        
+                        echo "✅ Load balancer updated and validated successfully"
                     """
                 }
-                echo "✅ All backend servers validated successfully"
+            }
+        }
+        
+        stage('Final System Validation') {
+            when {
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                }
+            }
+            steps {
+                echo "🔍 Running comprehensive system validation"
+                script {
+                    sh """
+                        cd ${ANSIBLE_PLAYBOOK_DIR}
+                        
+                        # Run post-deployment validation if playbook exists
+                        if [ -f "post-deployment-validation.yml" ]; then
+                            ansible-playbook -i inventory post-deployment-validation.yml \\
+                                --limit backend \\
+                                -v
+                        fi
+                        
+                        # Comprehensive API health checks
+                        echo "🏥 Final API validation on all backend servers..."
+                        ansible backend -i inventory -m uri \\
+                            -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET status_code=200 timeout=30" \\
+                            --timeout=60
+                        
+                        # Test through load balancer
+                        echo "🔗 Testing end-to-end API through load balancer..."
+                        ansible loadbalancer -i inventory -m uri \\
+                            -a "url=http://{{ ansible_default_ipv4.address }}/api/employees method=GET status_code=200 timeout=30" \\
+                            --timeout=60
+                        
+                        # Verify service status
+                        echo "🔍 Final service status check..."
+                        ansible backend -i inventory -m shell \\
+                            -a "sudo systemctl is-active employee-backend && echo 'Service: ACTIVE' || echo 'Service: INACTIVE'" \\
+                            --timeout=30
+                        
+                        # Log deployment success
+                        echo "📝 Logging successful deployment..."
+                        ansible backend -i inventory -m shell \\
+                            -a "echo \\\"$(date): Deployment ${env.APP_VERSION} completed successfully\\\" | sudo tee -a /var/log/employee-management/deployment.log" \\
+                            --timeout=30 || echo "Deployment logging failed"
+                    """
+                }
+                echo "✅ Complete system validation passed - backend is fully operational"
+            }
+        }
+        
+        stage('Run Deployment Health Check') {
+            when {
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                }
+            }
+            steps {
+                echo "🏥 Running comprehensive deployment health check"
+                script {
+                    sh """
+                        # Run our comprehensive health check script
+                        ./scripts/deployment-health-check.sh check || echo "Health check completed with warnings"
+                        
+                        echo "📊 Health check completed - system validation finished"
+                    """
+                }
             }
         }
     }

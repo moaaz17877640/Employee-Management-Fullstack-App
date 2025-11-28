@@ -333,7 +333,7 @@ pipeline {
                         # Log deployment success
                         echo "📝 Logging successful deployment..."
                         ansible backend -i inventory -m shell \\
-                            -a "echo \\\"$(date): Deployment ${env.APP_VERSION} completed successfully\\\" | sudo tee -a /var/log/employee-management/deployment.log" \\
+                            -a "echo \\\"\\\$(date): Deployment ${env.APP_VERSION} completed successfully\\\" | sudo tee -a /var/log/employee-management/deployment.log" \\
                             --timeout=30 || echo "Deployment logging failed"
                     """
                 }
@@ -370,7 +370,7 @@ pipeline {
                     if (fileExists('ansible/inventory')) {
                         dir('ansible') {
                             echo "🎯 Deployment completed successfully!"
-                            echo "Deployment ${env.APP_VERSION} successful at \$(date)" >> deployment.log
+                            echo "Deployment ${env.APP_VERSION} successful at \\\$(date)" >> deployment.log
                         }
                     } else {
                         echo "📝 Build completed successfully - no deployment logs in build-only mode"

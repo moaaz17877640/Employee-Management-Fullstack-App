@@ -146,7 +146,7 @@ pipeline {
                         
                         # Log successful deployment
                         ansible loadbalancer -i inventory -m shell \\
-                            -a "echo \"$(date): Frontend deployment ${env.BUILD_NUMBER} completed successfully\" | sudo tee -a /var/log/nginx/deployment.log" \\
+                            -a "echo \"\\\$(date): Frontend deployment ${env.BUILD_NUMBER} completed successfully\" | sudo tee -a /var/log/nginx/deployment.log" \\
                             --timeout=30 || echo "Deployment logging failed"
                     """
                 }

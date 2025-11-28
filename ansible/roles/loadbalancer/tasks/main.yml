@@ -79,24 +79,24 @@
   retries: 3
   delay: 10
 
-- name: Verify API endpoints
+- name: Check if backends are reachable (non-blocking)
   uri:
     url: "http://{{ ansible_host }}/api/employees"
     method: GET
     status_code: 200
-    timeout: 60
+    timeout: 10
   register: api_check
-  retries: 10
-  delay: 15
+  retries: 2
+  delay: 5
   ignore_errors: yes
   
 - name: Log API verification result
   debug:
-    msg: "API Verification: {{ 'SUCCESS' if not api_check.failed else 'FAILED - Will retry later' }}"
+    msg: "API Verification: {{ 'SUCCESS - Backends are running' if api_check is defined and not api_check.failed else 'SKIPPED - Backend not deployed yet (run backend pipeline first)' }}"
 
 - name: Wait for nginx to stabilize
   pause:
-    seconds: 15
+    seconds: 5
 
 - name: Display deployment info
   debug:

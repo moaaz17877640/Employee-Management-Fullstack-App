@@ -45,6 +45,10 @@ pipeline {
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/master']],
+                    extensions: [
+                        [$class: 'CloneOption', timeout: 60, shallow: true, depth: 1],
+                        [$class: 'CheckoutOption', timeout: 60]
+                    ],
                     userRemoteConfigs: [[url: env.GIT_REPO]]
                 ])
                 sh 'ls -la'

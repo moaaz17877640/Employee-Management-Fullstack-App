@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-// Pipeline Version: 2.1 - Password auth from Jenkins credentials
+// Pipeline Version: 2.2 - Password auth from inventory file
 
 pipeline {
     agent any
@@ -19,11 +19,6 @@ pipeline {
         // Ansible Configuration
         ANSIBLE_INVENTORY = 'ansible/inventory'
         ANSIBLE_HOST_KEY_CHECKING = 'False'
-        
-        // Server credentials from Jenkins secrets
-        DROPLET1_PASS = credentials('droplet1-password')
-        DROPLET2_PASS = credentials('droplet2-password')
-        DROPLET3_PASS = credentials('droplet3-password')
         
         // Database Configuration
         DB_HOST = 'localhost'
@@ -151,8 +146,8 @@ pipeline {
             steps {
                 echo "🚀 Deploying to backend servers with zero-downtime rolling restart"
                 
-                // Ensure sshpass is installed for password authentication
-                sh "which sshpass || sudo apt-get update && sudo apt-get install -y sshpass"
+                // Verify sshpass is installed (should be pre-installed on Jenkins server)
+                sh "which sshpass && echo '✅ sshpass is available'"
                 
                 script {
                     // Verify the JAR exists (it's already in backend/target/ from Package stage)
@@ -170,7 +165,6 @@ pipeline {
                         ansible-playbook -i inventory roles-playbook.yml \\
                             --limit droplet2 \\
                             --extra-vars "app_version=${env.APP_VERSION}" \\
-                            --extra-vars "ansible_password=${DROPLET2_PASS}" \\
                             -v
                     """
                     
@@ -183,7 +177,6 @@ pipeline {
                         cd ansible
                         ansible droplet2 -i inventory -m shell \
                             -a "curl -sf http://localhost:8080/api/employees || exit 1" \
-                            --extra-vars "ansible_password=${DROPLET2_PASS}" \
                             --timeout=60
                     """
                     echo "✅ Backend Server 1 healthy"
@@ -195,7 +188,6 @@ pipeline {
                         ansible-playbook -i inventory roles-playbook.yml \
                             --limit droplet3 \
                             --extra-vars "app_version=${env.APP_VERSION}" \
-                            --extra-vars "ansible_password=${DROPLET3_PASS}" \
                             -v
                     """
                     
@@ -208,7 +200,6 @@ pipeline {
                         cd ansible
                         ansible droplet3 -i inventory -m shell \
                             -a "curl -sf http://localhost:8080/api/employees || exit 1" \
-                            --extra-vars "ansible_password=${DROPLET3_PASS}" \
                             --timeout=60
                     """
                     echo "✅ Backend Server 2 healthy"
@@ -227,7 +218,6 @@ pipeline {
                     ansible-playbook -i inventory roles-playbook.yml \
                         --limit loadbalancer \
                         --extra-vars "reload_nginx=true" \
-                        --extra-vars "ansible_password=${DROPLET1_PASS}" \
                         -v
                 """
                 
@@ -236,7 +226,6 @@ pipeline {
                     cd ansible
                     ansible loadbalancer -i inventory -m shell \
                         -a "curl -sf http://localhost:8080/api/employees" \
-                        --extra-vars "ansible_password=${DROPLET1_PASS}" \
                         --timeout=60
                 """
                 echo "✅ Load balancer routing verified"
@@ -254,18 +243,15 @@ pipeline {
                     
                     echo "=== Backend Server 1 ==="
                     ansible droplet2 -i inventory -m shell \
-                        -a "systemctl is-active employee-backend" \
-                        --extra-vars "ansible_password=${DROPLET2_PASS}"
+                        -a "systemctl is-active employee-backend"
                     
                     echo "=== Backend Server 2 ==="
                     ansible droplet3 -i inventory -m shell \
-                        -a "systemctl is-active employee-backend" \
-                        --extra-vars "ansible_password=${DROPLET3_PASS}"
+                        -a "systemctl is-active employee-backend"
                     
                     echo "=== Load Balancer ==="
                     ansible loadbalancer -i inventory -m shell \
-                        -a "nginx -t && curl -sf http://localhost/api/employees" \
-                        --extra-vars "ansible_password=${DROPLET1_PASS}"
+                        -a "nginx -t && curl -sf http://localhost/api/employees"
                 """
                 echo "✅ All systems operational"
             }

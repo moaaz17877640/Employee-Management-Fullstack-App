@@ -207,8 +207,8 @@ pipeline {
                     sh """
                         cd ${ANSIBLE_PLAYBOOK_DIR}
                         
-                        # Ensure SSH key permissions
-                        chmod 400 ${SSH_KEY_PATH} || echo "SSH key permission already set"
+                        # Ensure SSH key permissions (adjust path from ansible directory)
+                        chmod 400 ../Key.pem || echo "SSH key permission already set"
                         
                         # Pre-deployment health check
                         echo "🔍 Pre-deployment server connectivity check..."
@@ -222,7 +222,6 @@ pipeline {
                             --extra-vars "deployment_strategy=backend_complete" \\
                             --extra-vars "force_restart=true" \\
                             --extra-vars "validate_deployment=true" \\
-                            --tags "backend" \\
                             -v
                         
                         # Wait for services to fully start

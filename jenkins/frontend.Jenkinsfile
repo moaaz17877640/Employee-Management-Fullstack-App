@@ -125,8 +125,8 @@ pipeline {
                 echo "🚀 Deploying React frontend with comprehensive validation"
                 script {
                     sh """
-                        # Set up SSH key permissions
-                        chmod 400 ${SSH_KEY_PATH} || echo "SSH key permission already set"
+                        # Set up SSH key permissions (before cd)
+                        chmod 400 Key.pem || echo "SSH key permission already set"
                         
                         cd ${ANSIBLE_PLAYBOOK_DIR}
                         
@@ -148,7 +148,6 @@ pipeline {
                             --extra-vars "build_number=${env.BUILD_NUMBER}" \\
                             --extra-vars "deployment_strategy=frontend_complete" \\
                             --extra-vars "update_backend_config=true" \\
-                            --tags "frontend,loadbalancer" \\
                             -v
                         
                         # Wait for Nginx to reload

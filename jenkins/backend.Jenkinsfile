@@ -18,7 +18,7 @@ pipeline {
         ANSIBLE_INVENTORY = '../test/ansible/inventory'
         ANSIBLE_PLAYBOOK_DIR = '../test/ansible'
         ANSIBLE_HOST_KEY_CHECKING = 'False'
-        SSH_KEY_PATH = '../test/Key.pem'
+        SSH_KEY_PATH = 'Key.pem'
         
         // Database Configuration (matching Ansible vars)
         DB_HOST = 'localhost'
@@ -86,12 +86,20 @@ pipeline {
                 echo "🔧 Setting up Ansible environment for enhanced deployment"
                 script {
                     sh """
+                        # Debug information
+                        echo "Current working directory: \$(pwd)"
+                        echo "SSH_KEY_PATH: ${SSH_KEY_PATH}"
+                        echo "Looking for SSH key..."
+                        ls -la ${SSH_KEY_PATH} || echo "Key not found at ${SSH_KEY_PATH}"
+                        
                         # Verify Ansible installation
                         ansible --version
                         
                         # Set up SSH key permissions (if key exists)
                         if [ -f "${SSH_KEY_PATH}" ]; then
                             chmod 400 ${SSH_KEY_PATH}
+                            echo "Set SSH key permissions to 400"
+                            ls -la ${SSH_KEY_PATH}
                         else
                             echo "SSH key not found at ${SSH_KEY_PATH}, skipping key setup"
                         fi

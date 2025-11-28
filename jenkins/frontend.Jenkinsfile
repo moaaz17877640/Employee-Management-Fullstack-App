@@ -14,11 +14,11 @@ pipeline {
         // System tool paths
         PATH = "/usr/bin:${env.PATH}"
         
-        // Enhanced Ansible Configuration
+        // Ansible Configuration
         ANSIBLE_INVENTORY = '../test/ansible/inventory'
         ANSIBLE_PLAYBOOK_DIR = '../test/ansible'
         ANSIBLE_HOST_KEY_CHECKING = 'False'
-        SSH_KEY_PATH = '../test/Key.pem'
+        SSH_KEY_PATH = 'Key.pem'
     }
     
     options {

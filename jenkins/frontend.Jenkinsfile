@@ -94,7 +94,8 @@ pipeline {
                         ansible backend -i inventory -m shell \\
                             -a "curl -f -s http://localhost:8080/api/employees || exit 1" \\
                             --timeout=60 || {
-                                echo "❌ Backend API not responding - may need backend deployment first"
+                                echo "❌ Backend API not responding - running recovery procedures..."
+                                ansible-playbook -i inventory error-recovery.yml --limit backend -v || echo "Recovery completed with warnings"
                                 echo "🔄 Attempting to restart backend services..."
                                 ansible backend -i inventory -m shell \\
                                     -a "sudo systemctl restart employee-backend" \\

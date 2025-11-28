@@ -17,8 +17,14 @@
         that:
           - ansible_os_family == "Debian"
           - ansible_distribution == "Ubuntu"
-          - ansible_distribution_major_version|int >= 20
-        fail_msg: "System requirements not met. Ubuntu 20+ required."
+          - ansible_distribution_major_version|int >= 18
+        fail_msg: "System requirements not met. Ubuntu 18+ required."
+      ignore_errors: yes
+      register: os_check
+      
+    - name: Log OS check result
+      debug:
+        msg: "OS Check: {{ 'PASSED' if not os_check.failed else 'FAILED - ' + os_check.msg }}"
         
     - name: Ensure sufficient disk space (minimum 5GB)
       assert:

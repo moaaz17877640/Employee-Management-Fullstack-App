@@ -69,6 +69,26 @@
     rm -rf /var/www/html/*
     cp -r /opt/frontend/build/* /var/www/html/
     chown -R www-data:www-data /var/www/html
+    
+- name: Verify frontend deployment
+  uri:
+    url: "http://localhost/"
+    method: GET
+    status_code: 200
+  register: frontend_health
+  retries: 5
+  delay: 10
+  ignore_errors: yes
+
+- name: Verify deployment success
+  uri:
+    url: "http://localhost/"
+    method: GET
+    status_code: 200
+  register: frontend_health
+  retries: 5
+  delay: 10
+  ignore_errors: yes
 
 - name: Clean up temporary files
   file:

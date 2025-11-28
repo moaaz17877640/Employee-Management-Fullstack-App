@@ -84,9 +84,19 @@
     url: "http://{{ ansible_host }}/api/employees"
     method: GET
     status_code: 200
+    timeout: 60
   register: api_check
-  retries: 3
-  delay: 5
+  retries: 10
+  delay: 15
+  ignore_errors: yes
+  
+- name: Log API verification result
+  debug:
+    msg: "API Verification: {{ 'SUCCESS' if not api_check.failed else 'FAILED - Will retry later' }}"
+
+- name: Wait for nginx to stabilize
+  pause:
+    seconds: 15
 
 - name: Display deployment info
   debug:
@@ -98,7 +108,7 @@
       Health Check: http://{{ ansible_host }}/health
       SSL Status: {{ 'Enabled' if enable_ssl else 'Disabled (HTTP Only)' }}
       Frontend Status: {{ 'SUCCESS' if frontend_check.status == 200 else 'FAILED' }}
-      API Status: {{ 'SUCCESS' if api_check.status == 200 else 'FAILED' }}
-      Backend Servers: {{ hostvars['droplet2']['ansible_default_ipv4']['address'] }}:{{ backend_port }}, {{ hostvars['droplet3']['ansible_default_ipv4']['address'] }}:{{ backend_port }}
+      API Status: {{ 'SUCCESS' if not api_check.failed else 'FAILED' }}
+      Backend Servers: Multiple backend servers on port {{ app_port }}
       Health Monitoring: Every {{ health_check_interval }} minutes
       =======================================

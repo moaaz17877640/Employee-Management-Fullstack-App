@@ -15,8 +15,8 @@ pipeline {
         PATH = "/usr/bin:${env.PATH}"
         
         // Ansible Configuration for new deployment system
-        ANSIBLE_INVENTORY = '../test/ansible/inventory'
-        ANSIBLE_PLAYBOOK_DIR = '../test/ansible'
+        ANSIBLE_INVENTORY = 'ansible/inventory'
+        ANSIBLE_PLAYBOOK_DIR = 'ansible'
         ANSIBLE_HOST_KEY_CHECKING = 'False'
         SSH_KEY_PATH = 'Key.pem'
         

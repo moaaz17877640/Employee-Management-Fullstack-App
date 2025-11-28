@@ -33,7 +33,9 @@ pipeline {
         // Ansible Configuration
         ANSIBLE_INVENTORY = 'ansible/inventory'
         ANSIBLE_HOST_KEY_CHECKING = 'False'
-        SSH_KEY_PATH = 'Key.pem'
+        
+        // Server credentials from Jenkins secrets
+        DROPLET1_PASS = credentials('droplet1-password')
     }
     
     options {
@@ -141,14 +143,17 @@ GENERATE_SOURCEMAP=false
             steps {
                 echo "🚀 Deploying React build to Load Balancer server (Droplet 1)"
                 
-                sh "chmod 400 ${SSH_KEY_PATH}"
+                // Ensure sshpass is installed for password authentication
+                sh "which sshpass || sudo apt-get update && sudo apt-get install -y sshpass"
                 
                 script {
                     // Pre-deployment: Verify server connectivity
                     echo "🔍 Verifying server connectivity..."
                     sh """
                         cd ansible
-                        ansible loadbalancer -i inventory -m ping --timeout=30
+                        ansible loadbalancer -i inventory -m ping \
+                            --extra-vars "ansible_password=${DROPLET1_PASS}" \
+                            --timeout=30
                     """
                     
                     // Deploy frontend using Ansible playbook
@@ -159,6 +164,7 @@ GENERATE_SOURCEMAP=false
                             --limit loadbalancer \
                             --extra-vars "app_version=${env.APP_VERSION}" \
                             --extra-vars "build_number=${env.BUILD_NUMBER}" \
+                            --extra-vars "ansible_password=${DROPLET1_PASS}" \
                             -v
                     """
                     
@@ -171,6 +177,7 @@ GENERATE_SOURCEMAP=false
                         cd ansible
                         ansible loadbalancer -i inventory -m shell \
                             -a "curl -sf http://localhost/ | head -20" \
+                            --extra-vars "ansible_password=${DROPLET1_PASS}" \
                             --timeout=60
                     """
                     
@@ -180,6 +187,7 @@ GENERATE_SOURCEMAP=false
                         cd ansible
                         ansible loadbalancer -i inventory -m shell \
                             -a "curl -sf http://localhost/api/employees" \
+                            --extra-vars "ansible_password=${DROPLET1_PASS}" \
                             --timeout=60
                     """
                 }

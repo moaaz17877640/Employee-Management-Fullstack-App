@@ -26,17 +26,17 @@ fact_caching_timeout=86400
 app_name=employee-management
 app_version=latest
 app_port=8080
-java_version=21
+java_version=17
 # Service reliability settings
 service_startup_delay=30
 health_check_retries=5
 health_check_delay=10
 
 # Database configuration
-db_host=YOUR_DATABASE_HOST
-db_name=employee_management
-db_user=employee_user
-db_password=YOUR_DB_PASSWORD
+mysql_root_password=rootpass123
+mysql_database=employee_management
+mysql_user=empapp
+mysql_password=emppass123
 
 # SSL/Domain configuration (Commented out - no domain available)
 # domain_name=emp-mgmt.yourdomain.com
@@ -63,7 +63,7 @@ react_build_path=/var/www/html/employee-management
 
 [backend:vars]
 # Backend specific variables
-java_home=/usr/lib/jvm/java-21-openjdk-amd64
+java_home=/usr/lib/jvm/java-17-openjdk-amd64
 app_jar_path=/opt/employee-management
 app_config_path=/etc/employee-management
 log_path=/var/log/employee-management

@@ -1,23 +1,37 @@
 #!/usr/bin/env groovy
 
+/**
+ * Frontend CI/CD Pipeline for Employee Management Application
+ * 
+ * Project: Employee Management Fullstack App – DevOps CI/CD & Deployment
+ * Tech Stack: React (Frontend)
+ * DevOps Tools: Ansible, Jenkins, Nginx
+ * 
+ * Pipeline Stages (as per project requirements):
+ * 1. Checkout code
+ * 2. Install dependencies
+ * 3. Build React production bundle
+ * 4. Deploy build files to Load Balancer server using Ansible
+ */
+
 pipeline {
     agent any
     
     environment {
+        // Application Configuration
         APP_NAME = 'employee-management-frontend'
         APP_VERSION = "${env.BUILD_NUMBER}"
         GIT_REPO = 'https://github.com/moaaz17877640/Employee-Management-Fullstack-App.git'
+        
+        // Node.js Configuration
         NODE_VERSION = '18'
+        
+        // React Environment Variables
         REACT_APP_API_URL = '/api'
         REACT_APP_ENVIRONMENT = 'production'
         
-        // System tool paths
-        NODE_HOME = '/usr/local/nodejs'
-        PATH = "/usr/bin:/usr/local/bin:${env.PATH}"
-        
         // Ansible Configuration
         ANSIBLE_INVENTORY = 'ansible/inventory'
-        ANSIBLE_PLAYBOOK_DIR = 'ansible'
         ANSIBLE_HOST_KEY_CHECKING = 'False'
         SSH_KEY_PATH = 'Key.pem'
     }
@@ -25,60 +39,51 @@ pipeline {
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 20, unit: 'MINUTES')
+        timestamps()
     }
     
     stages {
+        /**
+         * Stage 1: Checkout Code
+         */
         stage('Checkout Code') {
             steps {
-                echo "🔄 Cloning repository from ${env.GIT_REPO}"
-                script {
-                    // Clean workspace and clone fresh
-                    deleteDir()
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: '*/master']],
-                        userRemoteConfigs: [[
-                            url: env.GIT_REPO
-                        ]]
-                    ])
-                    sh 'pwd && ls -la'
-                }
+                echo "🔄 Checking out repository from ${env.GIT_REPO}"
+                deleteDir()
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/master']],
+                    userRemoteConfigs: [[url: env.GIT_REPO]]
+                ])
+                sh 'ls -la'
             }
         }
         
-        stage('Setup Node.js Environment') {
+        /**
+         * Stage 2: Install Dependencies
+         */
+        stage('Install Dependencies') {
             steps {
-                echo "⚙️ Setting up Node.js environment"
-                script {
+                dir('frontend') {
+                    echo "📦 Installing npm dependencies"
                     sh '''
-                        # Verify Node.js and npm versions
-                        node --version || echo "Node.js not found - using system default"
-                        npm --version || echo "npm not found - using system default"
+                        # Show Node.js and npm versions
+                        node --version
+                        npm --version
                         
-                        # Clear npm cache to prevent cache issues
-                        npm cache clean --force || echo "Cache clean failed, continuing..."
+                        # Clean install
+                        rm -rf node_modules package-lock.json
+                        
+                        # Install dependencies
+                        npm install --legacy-peer-deps
                     '''
                 }
             }
         }
         
-        stage('Install Dependencies') {
-            steps {
-                dir('frontend') {
-                    echo "📦 Installing npm dependencies"
-                    script {
-                        sh '''
-                            # Remove existing node_modules and package-lock to ensure fresh install
-                            rm -rf node_modules package-lock.json
-                            
-                            # Install dependencies with error handling
-                            npm install --legacy-peer-deps --timeout=300000
-                        '''
-                    }
-                }
-            }
-        }
-        
+        /**
+         * Stage 3: Build React Production Bundle
+         */
         stage('Build React Production Bundle') {
             steps {
                 dir('frontend') {
@@ -88,175 +93,134 @@ pipeline {
                     writeFile(
                         file: '.env.production',
                         text: """
-                            REACT_APP_API_URL=${env.REACT_APP_API_URL}
-                            REACT_APP_ENVIRONMENT=${env.REACT_APP_ENVIRONMENT}
-                            REACT_APP_VERSION=${env.APP_VERSION}
-                            GENERATE_SOURCEMAP=false
-                        """.stripIndent()
+REACT_APP_API_URL=${env.REACT_APP_API_URL}
+REACT_APP_ENVIRONMENT=${env.REACT_APP_ENVIRONMENT}
+REACT_APP_VERSION=${env.APP_VERSION}
+GENERATE_SOURCEMAP=false
+                        """.stripIndent().trim()
                     )
                     
-                    sh 'npm run build'
-                    sh 'ls -la build/'
+                    sh '''
+                        # Build production bundle
+                        npm run build
+                        
+                        # Verify build output
+                        ls -la build/
+                    '''
                     
-                    // Archive build artifacts using shell commands and archiveArtifacts
+                    // Archive build artifacts
                     script {
                         sh "tar -czf frontend-build-${env.BUILD_NUMBER}.tar.gz -C build ."
                         archiveArtifacts(
                             artifacts: "frontend-build-${env.BUILD_NUMBER}.tar.gz",
-                            fingerprint: true,
-                            allowEmptyArchive: false
+                            fingerprint: true
                         )
                     }
                 }
             }
         }
         
-        stage('Verify Backend Connectivity') {
-            when {
-                // Always verify backend before frontend deployment
-                expression { return true }
-            }
+        /**
+         * Stage 4: Deploy to Load Balancer Server using Ansible
+         * Deploy React build files to Droplet 1 (Load Balancer + Frontend)
+         */
+        stage('Deploy to Load Balancer') {
             steps {
-                echo "🔗 Verifying backend API connectivity before frontend deployment"
+                echo "🚀 Deploying React build to Load Balancer server (Droplet 1)"
+                
+                sh "chmod 400 ${SSH_KEY_PATH}"
+                
                 script {
+                    // Pre-deployment: Verify server connectivity
+                    echo "🔍 Verifying server connectivity..."
                     sh """
-                        cd ${ANSIBLE_PLAYBOOK_DIR}
-                        
-                        # Test backend API connectivity
-                        echo "🏥 Testing backend server API endpoints..."
-                        ansible backend -i inventory -m shell \\
-                            -a "curl -f -s http://localhost:8080/api/employees || exit 1" \\
-                            --timeout=60 || {
-                                echo "❌ Backend API not responding - running recovery procedures..."
-                                ansible-playbook -i inventory error-recovery.yml --limit backend -v || echo "Recovery completed with warnings"
-                                echo "🔄 Attempting to restart backend services..."
-                                ansible backend -i inventory -m shell \\
-                                    -a "sudo systemctl restart employee-backend" \\
-                                    --timeout=60 || echo "Service restart failed"
-                                sleep 30
-                                
-                                # Retry API test
-                                ansible backend -i inventory -m shell \\
-                                    -a "curl -f -s http://localhost:8080/api/employees || exit 1" \\
-                                    --timeout=60 || {
-                                        echo "⚠️ Backend API still not responding - frontend will deploy but API routing may fail"
-                                        echo "💡 Recommendation: Run backend pipeline first"
-                                    }
-                            }
-                        
-                        echo "✅ Backend connectivity verification completed"
-                    """
-                }
-            }
-        }
-        
-        stage('Deploy Frontend to Load Balancer (Ansible)') {
-            when {
-                // Always deploy frontend for local development
-                expression { return true }
-            }
-            steps {
-                echo "🚀 Deploying React frontend with comprehensive validation"
-                script {
-                    sh """
-                        # Set up SSH key permissions (before cd)
-                        chmod 400 Key.pem || echo "SSH key permission already set"
-                        
-                        cd ${ANSIBLE_PLAYBOOK_DIR}
-                        
-                        # Pre-deployment connectivity check
-                        echo "🔍 Pre-deployment connectivity validation..."
+                        cd ansible
                         ansible loadbalancer -i inventory -m ping --timeout=30
-                        
-                        # Pre-deployment validation for load balancer
-                        echo "🔍 Running pre-deployment validation for load balancer..."
-                        if [ -f "pre-deployment-check.yml" ]; then
-                            ansible-playbook -i inventory pre-deployment-check.yml -v --limit loadbalancer || echo "Pre-check completed with warnings"
-                        fi
-                        
-                        # Deploy frontend using roles-based system
-                        echo "📦 Deploying frontend build to load balancer..."
-                        ansible-playbook -i inventory roles-playbook.yml \\
-                            --limit loadbalancer \\
-                            --extra-vars "app_version=${env.APP_VERSION}" \\
-                            --extra-vars "build_number=${env.BUILD_NUMBER}" \\
-                            --extra-vars "deployment_strategy=frontend_complete" \\
-                            --extra-vars "update_backend_config=true" \\
+                    """
+                    
+                    // Deploy frontend using Ansible playbook
+                    echo "📦 Deploying frontend build files..."
+                    sh """
+                        cd ansible
+                        ansible-playbook -i inventory roles-playbook.yml \
+                            --limit loadbalancer \
+                            --extra-vars "app_version=${env.APP_VERSION}" \
+                            --extra-vars "build_number=${env.BUILD_NUMBER}" \
                             -v
-                        
-                        # Wait for Nginx to reload
-                        echo "⏳ Waiting for Nginx configuration reload..."
-                        sleep 15
-                        
-                        # Comprehensive validation
-                        echo "🔍 Running comprehensive frontend validation..."
-                        
-                        # Test frontend availability
-                        ansible loadbalancer -i inventory -m shell \\
-                            -a "curl -f -s http://localhost/ || exit 1" \\
+                    """
+                    
+                    // Wait for Nginx to reload
+                    sleep(time: 10, unit: 'SECONDS')
+                    
+                    // Verify frontend is served correctly
+                    echo "🔍 Verifying frontend deployment..."
+                    sh """
+                        cd ansible
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "curl -sf http://localhost/ | head -20" \
                             --timeout=60
-                        
-                        # Test API routing through load balancer
-                        echo "🔗 Testing API routing through load balancer..."
-                        ansible loadbalancer -i inventory -m shell \\
-                            -a "curl -f -s http://localhost/api/employees || exit 1" \\
+                    """
+                    
+                    // Verify API routing through Nginx
+                    echo "🔗 Verifying API routing through load balancer..."
+                    sh """
+                        cd ansible
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "curl -sf http://localhost/api/employees" \
                             --timeout=60
-                        
-                        # Verify Nginx configuration
-                        echo "⚙️ Verifying Nginx configuration..."
-                        ansible loadbalancer -i inventory -m shell \\
-                            -a "sudo nginx -t && sudo systemctl is-active nginx" \\
-                            --timeout=30
-                        
-                        # Post-deployment validation
-                        echo "✅ Running post-deployment validation..."
-                        if [ -f "post-deployment-validation.yml" ]; then
-                            ansible-playbook -i inventory post-deployment-validation.yml \\
-                                --limit loadbalancer \\
-                                -v || echo "Post-deployment validation completed with warnings"
-                        fi
-                        
-                        # Log successful deployment
-                        ansible loadbalancer -i inventory -m shell \\
-                            -a "echo \"\\\$(date): Frontend deployment ${env.BUILD_NUMBER} completed successfully\" | sudo tee -a /var/log/nginx/deployment.log" \\
-                            --timeout=30 || echo "Deployment logging failed"
                     """
                 }
-                echo "✅ Frontend deployment completed successfully with full validation"
             }
         }
         
-        stage('Final Health Check') {
-            when {
-                // Always run final health check for deployment validation
-                expression { return true }
-            }
+        /**
+         * Final Validation
+         */
+        stage('Final Validation') {
             steps {
-                echo "🏥 Running final deployment health check"
-                script {
-                    sh """
-                        # Run comprehensive health check to ensure everything is working
-                        ./scripts/deployment-health-check.sh check || echo "Health check completed with warnings"
-                        
-                        echo "📊 Final system health check completed"
-                    """
-                }
+                echo "🏥 Running final validation checks"
+                sh """
+                    cd ansible
+                    
+                    echo "=== Nginx Status ==="
+                    ansible loadbalancer -i inventory -m shell \
+                        -a "nginx -t && systemctl is-active nginx"
+                    
+                    echo "=== Frontend Served ==="
+                    ansible loadbalancer -i inventory -m shell \
+                        -a "curl -sf -o /dev/null -w '%{http_code}' http://localhost/"
+                    
+                    echo "=== API Routing ==="
+                    ansible loadbalancer -i inventory -m shell \
+                        -a "curl -sf -o /dev/null -w '%{http_code}' http://localhost/api/employees"
+                """
+                echo "✅ All validation checks passed"
             }
         }
     }
     
     post {
-        always {
-            echo "🧹 Cleaning up workspace"
-            cleanWs()
-        }
-        
         success {
-            echo "✅ Frontend CI/CD pipeline completed successfully!"
+            echo """
+            ✅ Frontend CI/CD Pipeline Completed Successfully!
+            
+            📋 Deployment Summary:
+            ─────────────────────────────────────
+            Version: ${env.APP_VERSION}
+            Build Archive: frontend-build-${env.BUILD_NUMBER}.tar.gz
+            Load Balancer (Droplet 1): ✅
+            Frontend Served: ✅
+            API Routing: ✅
+            ─────────────────────────────────────
+            """
         }
         
         failure {
             echo "❌ Frontend CI/CD pipeline failed!"
+        }
+        
+        always {
+            cleanWs()
         }
     }
 }

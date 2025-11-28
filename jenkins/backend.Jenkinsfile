@@ -1,112 +1,95 @@
 #!/usr/bin/env groovy
 
+/**
+ * Backend CI/CD Pipeline for Employee Management Application
+ * 
+ * Project: Employee Management Fullstack App – DevOps CI/CD & Deployment
+ * Tech Stack: Spring Boot (Backend), MySQL
+ * DevOps Tools: Ansible, Jenkins, Nginx
+ * 
+ * Pipeline Stages (as per project requirements):
+ * 1. Checkout repository
+ * 2. Build using Maven and migrate new changes on DB models
+ * 3. Run tests
+ * 4. Package JAR
+ * 5. (Optional) Build Docker image
+ * 6. Deploy to both backend servers using Ansible
+ * 7. Enable zero-downtime deploy (rolling restart)
+ */
+
 pipeline {
     agent any
     
     environment {
+        // Application Configuration
         APP_NAME = 'employee-management'
         APP_VERSION = "${env.BUILD_NUMBER}"
         GIT_REPO = 'https://github.com/moaaz17877640/Employee-Management-Fullstack-App.git'
-        MAVEN_OPTS = '-Dmaven.test.failure.ignore=false'
         
-        // System tool paths
-        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
+        // Java/Maven Configuration (Java 17 as per requirements)
+        JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
         MAVEN_HOME = '/usr/share/maven'
-        PATH = "/usr/bin:${env.PATH}:${JAVA_HOME}/bin"
+        PATH = "${JAVA_HOME}/bin:${MAVEN_HOME}/bin:/usr/bin:${env.PATH}"
         
-        // Ansible Configuration for new deployment system
+        // Ansible Configuration
         ANSIBLE_INVENTORY = 'ansible/inventory'
-        ANSIBLE_PLAYBOOK_DIR = 'ansible'
         ANSIBLE_HOST_KEY_CHECKING = 'False'
         SSH_KEY_PATH = 'Key.pem'
         
-        // Database Configuration (matching Ansible vars)
+        // Database Configuration
         DB_HOST = 'localhost'
         DB_NAME = 'employee_management'
-        DB_USER = 'empapp'
+        DB_USER = 'employee_user'
         DB_PASSWORD = 'emppass123'
-        ANSIBLE_FORCE_COLOR = 'true'
-        
-        // Application Environment Variables
-        MYSQL_HOST = 'localhost'
-        MYSQL_PORT = '3306'
-        MYSQL_DB = 'employee_management'
-        MYSQL_USER = 'empapp'
-        MYSQL_PASSWORD = 'emppass123'
-        MYSQL_SSL_MODE = 'DISABLED'
-        MONGO_URI = 'mongodb://localhost:27017/employee_management'
     }
     
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 30, unit: 'MINUTES')
+        timestamps()
     }
     
     stages {
+        /**
+         * Stage 1: Checkout Repository
+         */
         stage('Checkout Repository') {
             steps {
-                echo "🔄 Cloning repository from ${env.GIT_REPO}"
-                script {
-                    // Clean workspace and clone fresh
-                    deleteDir()
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: '*/master']],
-                        userRemoteConfigs: [[
-                            url: env.GIT_REPO
-                        ]]
-                    ])
-                    sh 'pwd && ls -la'
-                }
+                echo "🔄 Checking out repository from ${env.GIT_REPO}"
+                deleteDir()
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/master']],
+                    userRemoteConfigs: [[url: env.GIT_REPO]]
+                ])
+                sh 'ls -la'
             }
         }
         
-        stage('Setup Environment Configuration') {
-            steps {
-                dir('backend') {
-                    echo "⚙️ Setting up application configuration"
-                    script {
-                        // Create config.properties file with environment variables
-                        writeFile(
-                            file: 'config.properties',
-                            text: """
-                                MYSQL_HOST=${env.MYSQL_HOST}
-                                MYSQL_PORT=${env.MYSQL_PORT}
-                                MYSQL_DB=${env.MYSQL_DB}
-                                MYSQL_USER=${env.MYSQL_USER}
-                                MYSQL_PASSWORD=${env.MYSQL_PASSWORD}
-                                MYSQL_SSL_MODE=${env.MYSQL_SSL_MODE}
-                                MONGO_URI=${env.MONGO_URI}
-                            """.stripIndent()
-                        )
-                    }
-                }
-            }
-        }
-        
-        stage('Build using Maven') {
+        /**
+         * Stage 2: Build using Maven & Migrate Database Models
+         */
+        stage('Build & Migrate DB') {
             steps {
                 dir('backend') {
                     echo "🏗️ Building Spring Boot application with Maven"
                     sh 'mvn clean compile'
-                }
-            }
-        }
-        
-        stage('Migrate Database Models') {
-            steps {
-                dir('backend') {
-                    echo "🗄️ Running database migrations for new changes"
+                    
+                    echo "🗄️ Running database migrations for new model changes"
                     sh '''
-                        # Run database migration using Flyway
-                        mvn flyway:migrate -Dflyway.url=jdbc:mysql://${DB_HOST}:3306/${DB_NAME} \
-                                          -Dflyway.user=${DB_USER} \
-                                          -Dflyway.password=${DB_PASSWORD} || true
+                        # Run Flyway migrations if configured
+                        mvn flyway:migrate \
+                            -Dflyway.url=jdbc:mysql://${DB_HOST}:3306/${DB_NAME} \
+                            -Dflyway.user=${DB_USER} \
+                            -Dflyway.password=${DB_PASSWORD} || echo "Flyway migration skipped"
                     '''
                 }
             }
         }
         
+        /**
+         * Stage 3: Run Tests
+         */
         stage('Run Tests') {
             steps {
                 dir('backend') {
@@ -114,116 +97,45 @@ pipeline {
                     sh 'mvn test'
                 }
             }
-        }
-        
-        stage('Setup Ansible Environment') {
-            when {
-                // Always run for deployment - local repo doesn't need branch restrictions
-                expression { return true }
-            }
-            steps {
-                echo "🔧 Setting up Ansible environment for enhanced deployment"
-                script {
-                    sh """
-                        # Debug information
-                        echo "Current working directory: \$(pwd)"
-                        echo "SSH_KEY_PATH: ${SSH_KEY_PATH}"
-                        echo "Looking for SSH key..."
-                        ls -la ${SSH_KEY_PATH} || echo "Key not found at ${SSH_KEY_PATH}"
-                        
-                        # Verify Ansible installation
-                        ansible --version
-                        
-                        # Set up SSH key permissions (if key exists)
-                        if [ -f "${SSH_KEY_PATH}" ]; then
-                            chmod 400 ${SSH_KEY_PATH}
-                            echo "Set SSH key permissions to 400"
-                            ls -la ${SSH_KEY_PATH}
-                        else
-                            echo "SSH key not found at ${SSH_KEY_PATH}, skipping key setup"
-                        fi
-                        
-                        # Install/update required collections (if requirements exist)
-                        if [ -f "${ANSIBLE_PLAYBOOK_DIR}/requirements.yml" ]; then
-                            cd ${ANSIBLE_PLAYBOOK_DIR}
-                            ansible-galaxy collection install -r requirements.yml --force --ignore-errors
-                        else
-                            echo "Ansible requirements.yml not found, skipping collection install"
-                        fi
-                        
-                        # Run pre-deployment validation for backend servers only (if playbook exists)
-                        if [ -f "${ANSIBLE_PLAYBOOK_DIR}/pre-deployment-check.yml" ]; then
-                            echo "🔍 Running pre-deployment validation..."
-                            ansible-playbook -i ${ANSIBLE_INVENTORY} pre-deployment-check.yml -v --limit backend || {
-                                echo "⚠️ Pre-deployment check failed, running recovery..."
-                                ansible-playbook -i ${ANSIBLE_INVENTORY} error-recovery.yml --limit backend -v || echo "Recovery completed with warnings"
-                            }
-                        else
-                            echo "Pre-deployment check playbook not found, skipping"
-                        fi
-                    """
+            post {
+                always {
+                    junit(
+                        testResults: 'backend/target/surefire-reports/*.xml',
+                        allowEmptyResults: true
+                    )
                 }
-                echo "✅ Ansible environment setup completed"
             }
         }
         
+        /**
+         * Stage 4: Package JAR
+         */
         stage('Package JAR') {
             steps {
                 dir('backend') {
                     echo "📦 Packaging Spring Boot JAR"
                     sh 'mvn package -DskipTests'
                     
-                    // Store JAR info for deployment
                     script {
                         env.JAR_FILE = sh(
-                            script: 'ls target/*.jar | head -1',
+                            script: 'ls target/*.jar | grep -v original | head -1',
                             returnStdout: true
                         ).trim()
-                        
-                        env.JAR_NAME = sh(
-                            script: 'basename ${JAR_FILE}',
-                            returnStdout: true
-                        ).trim()
-                        
-                        echo "📋 Built JAR: ${env.JAR_NAME}"
+                        echo "📋 Built JAR: ${env.JAR_FILE}"
                     }
                     
-                    // Archive the JAR file
                     archiveArtifacts(
                         artifacts: 'target/*.jar',
-                        fingerprint: true,
-                        allowEmptyArchive: false
+                        fingerprint: true
                     )
                 }
             }
         }
         
-        stage('Pre-deployment Validation') {
-            when {
-                // Always run validation for deployment safety
-                expression { return true }
-            }
-            steps {
-                echo "🔍 Running pre-deployment checks on target servers"
-                script {
-                    sh """
-                        cd ansible
-                        # Ensure collections are installed
-                        ansible-galaxy collection install -r requirements.yml --ignore-errors
-                        
-                        # Run pre-deployment validation
-                        ansible-playbook -i inventory pre-deployment-check.yml \\
-                            --extra-vars "app_version=${env.APP_VERSION}" \\
-                            --limit backend \\
-                            --diff \\
-                            --check
-                    """
-                }
-                echo "✅ Pre-deployment validation completed"
-            }
-        }
-        
-        stage('Build Docker Image (Optional)') {
+        /**
+         * Stage 5: Build Docker Image (Optional)
+         */
+        stage('Build Docker Image') {
             when {
                 environment name: 'BUILD_DOCKER', value: 'true'
             }
@@ -231,229 +143,153 @@ pipeline {
                 dir('backend') {
                     echo "🐳 Building Docker image"
                     script {
-                        def dockerImage = docker.build("${env.APP_NAME}:${env.APP_VERSION}")
+                        docker.build("${env.APP_NAME}:${env.APP_VERSION}")
                         echo "📦 Docker image built: ${env.APP_NAME}:${env.APP_VERSION}"
-                        env.DOCKER_IMAGE = "${env.APP_NAME}:${env.APP_VERSION}"
                     }
                 }
             }
         }
         
-        stage('Deploy to Backend Servers using Ansible') {
-            when {
-                // Always deploy for local development environment
-                expression { return true }
-            }
+        /**
+         * Stage 6: Deploy to Backend Servers using Ansible
+         * Rolling deployment with zero-downtime (one server at a time)
+         */
+        stage('Deploy to Backend Servers') {
             steps {
-                echo "🚀 Deploying backend with comprehensive validation and health checks"
+                echo "🚀 Deploying to backend servers with zero-downtime rolling restart"
+                
+                sh "chmod 400 ${SSH_KEY_PATH}"
+                
                 script {
+                    // Ensure the JAR is in the expected location for Ansible
                     sh """
-                        cd ${ANSIBLE_PLAYBOOK_DIR}
-                        
-                        # Ensure SSH key permissions (adjust path from ansible directory)
-                        chmod 400 ../Key.pem || echo "SSH key permission already set"
-                        
-                        # Pre-deployment health check
-                        echo "🔍 Pre-deployment server connectivity check..."
-                        ansible backend -i inventory -m ping --timeout=30 || echo "Some servers unreachable, continuing..."
-                        
-                        # Deploy to all backend servers with full validation
-                        echo "📦 Deploying backend JAR to all servers..."
-                        ansible-playbook -i inventory roles-playbook.yml \\
-                            --limit backend \\
-                            --extra-vars "app_version=${env.APP_VERSION}" \\
-                            --extra-vars "deployment_strategy=backend_complete" \\
-                            --extra-vars "force_restart=true" \\
-                            --extra-vars "validate_deployment=true" \\
+                        mkdir -p backend/target
+                        cp ${env.JAR_FILE} backend/target/employee-management-app-0.0.1-SNAPSHOT.jar
+                    """
+                    
+                    // Rolling Deployment: Server 1 first, then Server 2
+                    
+                    // Deploy to Backend Server 1 (Droplet 2)
+                    echo "📦 [1/2] Deploying to Backend Server 1 (Droplet 2)..."
+                    sh """
+                        cd ansible
+                        ansible-playbook -i inventory roles-playbook.yml \
+                            --limit droplet2 \
+                            --extra-vars "app_version=${env.APP_VERSION}" \
                             -v
-                        
-                        # Wait for services to fully start
-                        echo "⏳ Waiting for backend services to fully initialize..."
-                        sleep 45
-                        
-                        # Comprehensive health validation
-                        echo "🏥 Running comprehensive health checks..."
-                        
-                        # Check if services are running
-                        ansible backend -i inventory -m shell \\
-                            -a "sudo systemctl is-active employee-backend || sudo systemctl status employee-backend" \\
-                            --timeout=30
-                        
-                        # Check if ports are open using localhost
-                        ansible backend -i inventory -m wait_for \\
-                            -a "port=8080 host=localhost timeout=60" \\
-                            --timeout=90
-                        
-                        # Test API endpoints on all servers using localhost
-                        echo "🔗 Testing API connectivity on all backend servers..."
-                        ansible backend -i inventory -m uri \\
-                            -a "url=http://localhost:8080/api/employees method=GET timeout=30" \\
-                            --timeout=60 || {
-                                echo "❌ API test failed, checking service logs..."
-                                ansible backend -i inventory -m shell \\
-                                    -a "sudo journalctl -u employee-backend --no-pager -n 20" \\
-                                    --timeout=30
-                                exit 1
-                            }
-                        
-                        echo "✅ Backend deployment and validation completed successfully"
                     """
-                }
-            }
-        }
-        
-        stage('Update Load Balancer Configuration') {
-            when {
-                // Always update load balancer after backend deployment
-                expression { return true }
-            }
-            steps {
-                echo "🔄 Updating load balancer with current backend server IPs"
-                script {
+                    
+                    // Wait for service to start
+                    sleep(time: 30, unit: 'SECONDS')
+                    
+                    // Health check Server 1
+                    echo "🏥 Health check Backend Server 1..."
                     sh """
-                        cd ${ANSIBLE_PLAYBOOK_DIR}
-                        
-                        # Gather facts from backend servers to get internal IPs
-                        ansible backend -i inventory -m setup --tree /tmp/facts/
-                        
-                        # Update load balancer configuration with current IPs
-                        ansible-playbook -i inventory roles-playbook.yml \\
-                            --limit loadbalancer \\
-                            --extra-vars "update_backend_ips=true" \\
-                            --extra-vars "reload_nginx=true" \\
-                            --tags "loadbalancer,backend_config" \\
+                        cd ansible
+                        ansible droplet2 -i inventory -m shell \
+                            -a "curl -sf http://localhost:8080/api/employees || exit 1" \
+                            --timeout=60
+                    """
+                    echo "✅ Backend Server 1 healthy"
+                    
+                    // Deploy to Backend Server 2 (Droplet 3)
+                    echo "📦 [2/2] Deploying to Backend Server 2 (Droplet 3)..."
+                    sh """
+                        cd ansible
+                        ansible-playbook -i inventory roles-playbook.yml \
+                            --limit droplet3 \
+                            --extra-vars "app_version=${env.APP_VERSION}" \
                             -v
-                        
-                        # Test load balancer routing
-                        echo "🔗 Testing load balancer API routing..."
-                        ansible loadbalancer -i inventory -m uri \\
-                            -a "url=http://localhost/api/employees method=GET timeout=30" \\
-                            --timeout=60
-                        
-                        echo "✅ Load balancer updated and validated successfully"
                     """
+                    
+                    // Wait for service to start
+                    sleep(time: 30, unit: 'SECONDS')
+                    
+                    // Health check Server 2
+                    echo "🏥 Health check Backend Server 2..."
+                    sh """
+                        cd ansible
+                        ansible droplet3 -i inventory -m shell \
+                            -a "curl -sf http://localhost:8080/api/employees || exit 1" \
+                            --timeout=60
+                    """
+                    echo "✅ Backend Server 2 healthy"
                 }
             }
         }
         
-        stage('Final System Validation') {
-            when {
-                // Always run system validation for reliability
-                expression { return true }
-            }
+        /**
+         * Stage 7: Update Load Balancer & Validate
+         */
+        stage('Update Load Balancer') {
             steps {
-                echo "🔍 Running comprehensive system validation"
-                script {
-                    sh """
-                        cd ${ANSIBLE_PLAYBOOK_DIR}
-                        
-                        # Run post-deployment validation if playbook exists
-                        if [ -f "post-deployment-validation.yml" ]; then
-                            ansible-playbook -i inventory post-deployment-validation.yml \\
-                                --limit backend \\
-                                -v
-                        fi
-                        
-                        # Comprehensive API health checks
-                        echo "🏥 Final API validation on all backend servers..."
-                        ansible backend -i inventory -m uri \
-                            -a "url=http://localhost:8080/api/employees method=GET status_code=200 timeout=30" \
-                            --timeout=60 || echo "⚠️ Some backend API checks failed, continuing..."
-                        
-                        # Test through load balancer
-                        echo "🔗 Testing end-to-end API through load balancer..."
-                        ansible loadbalancer -i inventory -m uri \\
-                            -a "url=http://localhost/api/employees method=GET status_code=200 timeout=30" \\
-                            --timeout=60
-                        
-                        # Verify service status
-                        echo "🔍 Final service status check..."
-                        ansible backend -i inventory -m shell \\
-                            -a "sudo systemctl is-active employee-backend && echo 'Service: ACTIVE' || echo 'Service: INACTIVE'" \\
-                            --timeout=30
-                        
-                        # Log deployment success
-                        echo "📝 Logging successful deployment..."
-                        ansible backend -i inventory -m shell \\
-                            -a "echo \\\"\\\$(date): Deployment ${env.APP_VERSION} completed successfully\\\" | sudo tee -a /var/log/employee-management/deployment.log" \\
-                            --timeout=30 || echo "Deployment logging failed"
-                    """
-                }
-                echo "✅ Complete system validation passed - backend is fully operational"
+                echo "🔄 Updating load balancer with backend servers"
+                sh """
+                    cd ansible
+                    ansible-playbook -i inventory roles-playbook.yml \
+                        --limit loadbalancer \
+                        --extra-vars "reload_nginx=true" \
+                        -v
+                """
+                
+                echo "🔗 Validating load balancer API routing..."
+                sh """
+                    cd ansible
+                    ansible loadbalancer -i inventory -m shell \
+                        -a "curl -sf http://localhost/api/employees" \
+                        --timeout=60
+                """
+                echo "✅ Load balancer routing verified"
             }
         }
         
-        stage('Post-Deployment Health Check') {
-            when {
-                // Always run health checks after deployment
-                expression { return true }
-            }
+        /**
+         * Final Health Check
+         */
+        stage('Final Validation') {
             steps {
-                echo "🏥 Running comprehensive deployment health check"
-                script {
-                    sh """
-                        # Run our comprehensive health check script
-                        ./scripts/deployment-health-check.sh check || echo "Health check completed with warnings"
-                        
-                        echo "📊 Health check completed - system validation finished"
-                    """
-                }
+                echo "🏥 Running final system validation"
+                sh """
+                    cd ansible
+                    
+                    echo "=== Backend Server 1 ==="
+                    ansible droplet2 -i inventory -m shell \
+                        -a "systemctl is-active employee-backend"
+                    
+                    echo "=== Backend Server 2 ==="
+                    ansible droplet3 -i inventory -m shell \
+                        -a "systemctl is-active employee-backend"
+                    
+                    echo "=== Load Balancer ==="
+                    ansible loadbalancer -i inventory -m shell \
+                        -a "nginx -t && curl -sf http://localhost/api/employees"
+                """
+                echo "✅ All systems operational"
             }
         }
     }
     
     post {
         success {
-            echo "✅ Backend CI/CD pipeline completed successfully!"
-            script {
-                try {
-                    if (fileExists('ansible/inventory')) {
-                        dir('ansible') {
-                            echo "🎯 Deployment completed successfully!"
-                            echo "Deployment ${env.APP_VERSION} successful at \\\$(date)" >> deployment.log
-                        }
-                    } else {
-                        echo "📝 Build completed successfully - no deployment logs in build-only mode"
-                    }
-                } catch (Exception e) {
-                    echo "⚠️ Post-deployment logging failed: ${e.getMessage()}"
-                }
-            }
+            echo """
+            ✅ Backend CI/CD Pipeline Completed Successfully!
+            
+            📋 Deployment Summary:
+            ─────────────────────────────────────
+            Version: ${env.APP_VERSION}
+            Backend Server 1 (Droplet 2): ✅
+            Backend Server 2 (Droplet 3): ✅
+            Load Balancer Updated: ✅
+            Zero-Downtime Deploy: ✅
+            ─────────────────────────────────────
+            """
         }
         
         failure {
             echo "❌ Backend CI/CD pipeline failed!"
-            script {
-                if (env.BRANCH_NAME == 'master') {
-                    try {
-                        if (fileExists('ansible/inventory')) {
-                            dir('ansible') {
-                                echo "🔄 Attempting rollback due to pipeline failure..."
-                                sh """
-                                    ansible-playbook -i inventory site.yml \\
-                                        --tags "rollback,backend" \\
-                                        --extra-vars "rollback_version=previous" \\
-                                        --limit backend \\
-                                        --timeout 180 || echo "Rollback failed - manual intervention required"
-                                """
-                            }
-                        } else {
-                            echo "📝 Build failed - no deployment rollback needed in build-only mode"
-                        }
-                    } catch (Exception e) {
-                        echo "⚠️ Automated rollback failed: ${e.getMessage()}"
-                        echo "Manual intervention required for service recovery"
-                    }
-                }
-            }
-        }
-        
-        unstable {
-            echo "⚠️ Pipeline completed with warnings"
         }
         
         always {
-            echo "🧹 Cleaning up workspace"
             cleanWs()
         }
     }

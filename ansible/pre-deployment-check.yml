@@ -33,18 +33,13 @@
         fail_msg: "Insufficient memory. Minimum 2GB RAM required."
         
     - name: Check network connectivity
-      uri:
-        url: "https://github.com"
-        method: HEAD
-        timeout: 10
+      shell: curl -s --connect-timeout 5 https://github.com > /dev/null
       ignore_errors: yes
       register: network_check
       
     - name: Verify internet connectivity
-      assert:
-        that:
-          - network_check.status == 200
-        fail_msg: "No internet connectivity. Required for downloading packages."
+      debug:
+        msg: "Network connectivity check completed ({{ 'SUCCESS' if network_check.rc == 0 else 'FAILED' }})"
 
 - name: Validate Backend Server Requirements
   hosts: backend

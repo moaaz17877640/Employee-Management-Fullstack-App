@@ -79,10 +79,8 @@ pipeline {
         
         stage('Setup Ansible Environment') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                }
+                // Always run for deployment - local repo doesn't need branch restrictions
+                expression { return true }
             }
             steps {
                 echo "🔧 Setting up Ansible environment for enhanced deployment"
@@ -152,7 +150,8 @@ pipeline {
         
         stage('Pre-deployment Validation') {
             when {
-                branch 'master'
+                // Always run validation for deployment safety
+                expression { return true }
             }
             steps {
                 echo "🔍 Running pre-deployment checks on target servers"
@@ -192,10 +191,8 @@ pipeline {
         
         stage('Deploy to Backend Servers using Ansible') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                }
+                // Always deploy for local development environment
+                expression { return true }
             }
             steps {
                 echo "🚀 Deploying backend with comprehensive validation and health checks"
@@ -258,10 +255,8 @@ pipeline {
         
         stage('Update Load Balancer Configuration') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                }
+                // Always update load balancer after backend deployment
+                expression { return true }
             }
             steps {
                 echo "🔄 Updating load balancer with current backend server IPs"
@@ -294,10 +289,8 @@ pipeline {
         
         stage('Final System Validation') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                }
+                // Always run system validation for reliability
+                expression { return true }
             }
             steps {
                 echo "🔍 Running comprehensive system validation"
@@ -341,12 +334,10 @@ pipeline {
             }
         }
         
-        stage('Run Deployment Health Check') {
+        stage('Post-Deployment Health Check') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                }
+                // Always run health checks after deployment
+                expression { return true }
             }
             steps {
                 echo "🏥 Running comprehensive deployment health check"

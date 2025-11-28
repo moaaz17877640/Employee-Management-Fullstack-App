@@ -77,10 +77,8 @@ pipeline {
         
         stage('Verify Backend Connectivity') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                }
+                // Always verify backend before frontend deployment
+                expression { return true }
             }
             steps {
                 echo "🔗 Verifying backend API connectivity before frontend deployment"
@@ -117,10 +115,8 @@ pipeline {
         
         stage('Deploy Frontend to Load Balancer (Ansible)') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                }
+                // Always deploy frontend for local development
+                expression { return true }
             }
             steps {
                 echo "🚀 Deploying React frontend with comprehensive validation"
@@ -196,10 +192,8 @@ pipeline {
         
         stage('Final Health Check') {
             when {
-                anyOf {
-                    branch 'master'
-                    branch 'main'
-                }
+                // Always run final health check for deployment validation
+                expression { return true }
             }
             steps {
                 echo "🏥 Running final deployment health check"

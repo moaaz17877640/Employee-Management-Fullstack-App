@@ -236,15 +236,15 @@ pipeline {
                             -a "sudo systemctl is-active employee-backend || sudo systemctl status employee-backend" \\
                             --timeout=30
                         
-                        # Check if ports are open
+                        # Check if ports are open using localhost
                         ansible backend -i inventory -m wait_for \\
-                            -a "port=8080 host={{ ansible_default_ipv4.address }} timeout=60" \\
+                            -a "port=8080 host=localhost timeout=60" \\
                             --timeout=90
                         
-                        # Test API endpoints on all servers
+                        # Test API endpoints on all servers using localhost
                         echo "🔗 Testing API connectivity on all backend servers..."
                         ansible backend -i inventory -m uri \\
-                            -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET timeout=30" \\
+                            -a "url=http://localhost:8080/api/employees method=GET timeout=30" \\
                             --timeout=60 || {
                                 echo "❌ API test failed, checking service logs..."
                                 ansible backend -i inventory -m shell \\
@@ -284,7 +284,7 @@ pipeline {
                         # Test load balancer routing
                         echo "🔗 Testing load balancer API routing..."
                         ansible loadbalancer -i inventory -m uri \\
-                            -a "url=http://{{ ansible_default_ipv4.address }}/api/employees method=GET timeout=30" \\
+                            -a "url=http://localhost/api/employees method=GET timeout=30" \\
                             --timeout=60
                         
                         echo "✅ Load balancer updated and validated successfully"
@@ -320,7 +320,7 @@ pipeline {
                         # Test through load balancer
                         echo "🔗 Testing end-to-end API through load balancer..."
                         ansible loadbalancer -i inventory -m uri \\
-                            -a "url=http://{{ ansible_default_ipv4.address }}/api/employees method=GET status_code=200 timeout=30" \\
+                            -a "url=http://localhost/api/employees method=GET status_code=200 timeout=30" \\
                             --timeout=60
                         
                         # Verify service status

@@ -75,7 +75,47 @@ pipeline {
             }
         }
         
-        stage('Verify Backend Connectivity') {\n            when {\n                anyOf {\n                    branch 'master'\n                    branch 'main'\n                }\n            }\n            steps {\n                echo \"🔗 Verifying backend API connectivity before frontend deployment\"\n                script {\n                    sh \"\"\"\n                        cd ${ANSIBLE_PLAYBOOK_DIR}\n                        \n                        # Test backend API connectivity\n                        echo \"🏥 Testing backend server API endpoints...\"\n                        ansible backend -i inventory -m uri \\\\\n                            -a \"url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET timeout=30\" \\\\\n                            --timeout=60 || {\n                                echo \"❌ Backend API not responding - may need backend deployment first\"\n                                echo \"🔄 Attempting to restart backend services...\"\n                                ansible backend -i inventory -m shell \\\\\n                                    -a \"sudo systemctl restart employee-backend\" \\\\\n                                    --timeout=60 || echo \"Service restart failed\"\n                                sleep 30\n                                \n                                # Retry API test\n                                ansible backend -i inventory -m uri \\\\\n                                    -a \"url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET timeout=30\" \\\\\n                                    --timeout=60 || {\n                                        echo \"⚠️ Backend API still not responding - frontend will deploy but API routing may fail\"\n                                        echo \"💡 Recommendation: Run backend pipeline first\"\n                                    }\n                            }\n                        \n                        echo \"✅ Backend connectivity verification completed\"\n                    \"\"\"\n                }\n            }\n        }\n        \n        stage('Deploy Frontend to Load Balancer (Ansible)') {"
+        stage('Verify Backend Connectivity') {
+            when {
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                }
+            }
+            steps {
+                echo "🔗 Verifying backend API connectivity before frontend deployment"
+                script {
+                    sh """
+                        cd ${ANSIBLE_PLAYBOOK_DIR}
+                        
+                        # Test backend API connectivity
+                        echo "🏥 Testing backend server API endpoints..."
+                        ansible backend -i inventory -m uri \\
+                            -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET timeout=30" \\
+                            --timeout=60 || {
+                                echo "❌ Backend API not responding - may need backend deployment first"
+                                echo "🔄 Attempting to restart backend services..."
+                                ansible backend -i inventory -m shell \\
+                                    -a "sudo systemctl restart employee-backend" \\
+                                    --timeout=60 || echo "Service restart failed"
+                                sleep 30
+                                
+                                # Retry API test
+                                ansible backend -i inventory -m uri \\
+                                    -a "url=http://{{ ansible_default_ipv4.address }}:8080/api/employees method=GET timeout=30" \\
+                                    --timeout=60 || {
+                                        echo "⚠️ Backend API still not responding - frontend will deploy but API routing may fail"
+                                        echo "💡 Recommendation: Run backend pipeline first"
+                                    }
+                            }
+                        
+                        echo "✅ Backend connectivity verification completed"
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy Frontend to Load Balancer (Ansible)') {
             when {
                 anyOf {
                     branch 'master'

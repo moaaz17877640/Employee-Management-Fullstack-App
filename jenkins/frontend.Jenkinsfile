@@ -6,7 +6,7 @@ pipeline {
     environment {
         APP_NAME = 'employee-management-frontend'
         APP_VERSION = "${env.BUILD_NUMBER}"
-        GIT_REPO = 'https://github.com/hoangsonww/Employee-Management-Fullstack-App.git'
+        GIT_REPO = '/home/moaz/test/Employee-Management-Fullstack-App'
         NODE_VERSION = '18'
         REACT_APP_API_URL = '/api'
         REACT_APP_ENVIRONMENT = 'production'
@@ -19,7 +19,7 @@ pipeline {
     }
     
     tools {
-        nodejs "NodeJS-${env.NODE_VERSION}"
+        nodejs "nodejs"
     }
     
     options {
@@ -30,15 +30,11 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                echo "🔄 Checking out code from ${env.GIT_REPO}"
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/master']],
-                    doGenerateSubmoduleConfigurations: false,
-                    extensions: [[$class: 'CleanCheckout']],
-                    submoduleCfg: [],
-                    userRemoteConfigs: [[url: env.GIT_REPO]]
-                ])
+                echo "🔄 Using local repository at ${env.GIT_REPO}"
+                script {
+                    // We're already in the correct directory
+                    sh 'pwd && ls -la'
+                }
             }
         }
         

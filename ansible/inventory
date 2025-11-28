@@ -3,13 +3,13 @@
 
 [loadbalancer]
 # Droplet 1 - Load Balancer + Frontend
-droplet1 ansible_host=98.89.37.16 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
+droplet1 ansible_host=23.22.172.211 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
 
 [backend]
 # Droplet 2 - Backend Instance #1
-droplet2 ansible_host=34.228.254.14 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
+droplet2 ansible_host=52.201.244.231 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
 # Droplet 3 - Backend Instance #2  
-droplet3 ansible_host=54.221.75.80 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
+droplet3 ansible_host=54.91.101.177 ansible_user=ubuntu ansible_ssh_private_key_file=../Key.pem
 
 [all:vars]
 # Global variables

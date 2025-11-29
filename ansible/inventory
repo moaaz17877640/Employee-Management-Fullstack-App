@@ -1,15 +1,16 @@
 # Ansible Inventory for Employee Management App - Madaar Solutions
 # DigitalOcean Droplet Configuration
+# NOTE: Passwords are injected via Jenkins credentials - DO NOT hardcode secrets here
 
 [loadbalancer]
 # Droplet 1 - Load Balancer + Frontend
-droplet1 ansible_host=165.232.112.136 ansible_user=root ansible_password=4Dun8YzW01DU
+droplet1 ansible_host=165.232.112.136 ansible_user=root
 
 [backend]
 # Droplet 2 - Backend Instance #1
-droplet2 ansible_host=138.68.90.46 ansible_user=root ansible_password=SehFaNG7dOxUnr
+droplet2 ansible_host=138.68.90.46 ansible_user=root
 # Droplet 3 - Backend Instance #2  
-droplet3 ansible_host=206.189.61.18 ansible_user=root ansible_password=SehFaNG7dOxUnr
+droplet3 ansible_host=206.189.61.18 ansible_user=root
 
 [all:vars]
 # Global variables

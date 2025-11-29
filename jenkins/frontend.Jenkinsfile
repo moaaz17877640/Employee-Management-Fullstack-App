@@ -51,15 +51,19 @@ pipeline {
             steps {
                 echo "🔄 Checking out repository from ${env.GIT_REPO}"
                 deleteDir()
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/master']],
-                    extensions: [
-                        [$class: 'CloneOption', timeout: 60, shallow: true, depth: 1],
-                        [$class: 'CheckoutOption', timeout: 60]
-                    ],
-                    userRemoteConfigs: [[url: env.GIT_REPO]]
-                ])
+                
+                // Use git command with retry for network resilience
+                retry(3) {
+                    sh '''
+                        # Configure git for better network handling
+                        git config --global http.postBuffer 524288000
+                        git config --global http.lowSpeedLimit 1000
+                        git config --global http.lowSpeedTime 60
+                        
+                        # Clone with shallow depth
+                        git clone --depth 1 --branch master https://github.com/moaaz17877640/Employee-Management-Fullstack-App.git .
+                    '''
+                }
                 sh 'ls -la'
             }
         }

@@ -56,15 +56,22 @@
   args:
     chdir: /opt/frontend
   environment:
-    NODE_OPTIONS: "--max-old-space-size=1024"
+    NODE_OPTIONS: "--max-old-space-size=2048"
+  async: 600
+  poll: 30
 
 - name: Build React frontend
-  command: npm run build
+  shell: |
+    cd /opt/frontend
+    npm run build
   args:
     chdir: /opt/frontend
   environment:
-    NODE_OPTIONS: "--max-old-space-size=1024"
+    NODE_OPTIONS: "--max-old-space-size=2048"
     CI: "false"
+    GENERATE_SOURCEMAP: "false"
+  async: 900
+  poll: 30
 
 - name: Deploy built React app
   shell: |

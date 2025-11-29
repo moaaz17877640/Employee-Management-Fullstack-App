@@ -50,19 +50,26 @@ pipeline {
          */
         stage('Checkout Code') {
             steps {
-                echo "🔄 Checking out repository from ${env.GIT_REPO}"
+                echo "🔄 Downloading repository as ZIP (faster than git clone)"
                 deleteDir()
                 
-                // Use git command with retry for network resilience
+                // Download ZIP archive instead of git clone (faster on slow networks)
                 retry(3) {
                     sh '''
-                        # Configure git for better network handling
-                        git config --global http.postBuffer 524288000
-                        git config --global http.lowSpeedLimit 1000
-                        git config --global http.lowSpeedTime 60
+                        # Download repository as ZIP archive
+                        curl -L -o repo.zip https://github.com/moaaz17877640/Employee-Management-Fullstack-App/archive/refs/heads/master.zip \
+                            --retry 5 \
+                            --retry-delay 10 \
+                            --retry-max-time 600 \
+                            --connect-timeout 60 \
+                            --max-time 900
                         
-                        # Clone with shallow depth
-                        git clone --depth 1 --branch master https://github.com/moaaz17877640/Employee-Management-Fullstack-App.git .
+                        # Extract and move files
+                        unzip -q repo.zip
+                        mv Employee-Management-Fullstack-App-master/* .
+                        mv Employee-Management-Fullstack-App-master/.* . 2>/dev/null || true
+                        rmdir Employee-Management-Fullstack-App-master
+                        rm repo.zip
                     '''
                 }
                 sh 'ls -la'

@@ -7,14 +7,13 @@
  * Tech Stack: React (Frontend)
  * DevOps Tools: Ansible, Jenkins, Nginx
  * 
- * Pipeline Stages (as per project requirements):
+ * Pipeline Stages:
  * 1. Checkout code
  * 2. Install dependencies
  * 3. Build React production bundle
  * 4. Deploy build files to Load Balancer server using Ansible
  * 
- * Required Jenkins Credentials:
- * - LOADBALANCER_SSH_PASSWORD: SSH password for droplet1 (Load Balancer)
+ * Note: SSH passwords are stored in ansible/inventory file
  */
 
 pipeline {
@@ -146,52 +145,45 @@ GENERATE_SOURCEMAP=false
                 // Verify sshpass is installed (should be pre-installed on Jenkins server)
                 sh "which sshpass && echo '✅ sshpass is available'"
                 
-                // Use Jenkins credentials for SSH password
-                withCredentials([string(credentialsId: 'LOADBALANCER_SSH_PASSWORD', variable: 'LB_PASSWORD')]) {
-                    script {
-                        // Pre-deployment: Verify server connectivity
-                        echo "🔍 Verifying server connectivity..."
-                        sh '''
-                            cd ansible
-                            ansible loadbalancer -i inventory -m ping --timeout=30 \
-                                --extra-vars "ansible_password=${LB_PASSWORD}"
-                        '''
-                        
-                        // Deploy frontend using Ansible playbook
-                        echo "📦 Deploying frontend build files..."
-                        sh """
-                            cd ansible
-                            ansible-playbook -i inventory roles-playbook.yml \
-                                --limit loadbalancer \
-                                --extra-vars "ansible_password=\${LB_PASSWORD}" \
-                                --extra-vars "app_version=${env.APP_VERSION}" \
-                                --extra-vars "build_number=${env.BUILD_NUMBER}" \
-                                -v
-                        """
-                        
-                        // Wait for Nginx to reload
-                        sleep(time: 10, unit: 'SECONDS')
-                        
-                        // Verify frontend is served correctly
-                        echo "🔍 Verifying frontend deployment..."
-                        sh '''
-                            cd ansible
-                            ansible loadbalancer -i inventory -m shell \
-                                -a "curl -sf http://localhost/ | head -20" \
-                                --extra-vars "ansible_password=${LB_PASSWORD}" \
-                                --timeout=60
-                        '''
-                        
-                        // Verify API routing through Nginx (optional - backend may not be deployed yet)
-                        echo "🔗 Checking API routing (optional - backend may not be deployed)..."
-                        sh '''
-                            cd ansible
-                            ansible loadbalancer -i inventory -m shell \
-                                -a "curl -sf --max-time 5 http://localhost/api/employees || echo 'API not available yet - run backend pipeline first'" \
-                                --extra-vars "ansible_password=${LB_PASSWORD}" \
-                                --timeout=30
-                        '''
-                    }
+                script {
+                    // Pre-deployment: Verify server connectivity
+                    echo "🔍 Verifying server connectivity..."
+                    sh """
+                        cd ansible
+                        ansible loadbalancer -i inventory -m ping --timeout=30
+                    """
+                    
+                    // Deploy frontend using Ansible playbook
+                    echo "📦 Deploying frontend build files..."
+                    sh """
+                        cd ansible
+                        ansible-playbook -i inventory roles-playbook.yml \
+                            --limit loadbalancer \
+                            --extra-vars "app_version=${env.APP_VERSION}" \
+                            --extra-vars "build_number=${env.BUILD_NUMBER}" \
+                            -v
+                    """
+                    
+                    // Wait for Nginx to reload
+                    sleep(time: 10, unit: 'SECONDS')
+                    
+                    // Verify frontend is served correctly
+                    echo "🔍 Verifying frontend deployment..."
+                    sh """
+                        cd ansible
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "curl -sf http://localhost/ | head -20" \
+                            --timeout=60
+                    """
+                    
+                    // Verify API routing through Nginx (optional - backend may not be deployed yet)
+                    echo "🔗 Checking API routing (optional - backend may not be deployed)..."
+                    sh """
+                        cd ansible
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "curl -sf --max-time 5 http://localhost/api/employees || echo 'API not available yet - run backend pipeline first'" \
+                            --timeout=30
+                    """
                 }
             }
         }
@@ -202,27 +194,21 @@ GENERATE_SOURCEMAP=false
         stage('Final Validation') {
             steps {
                 echo "🏥 Running final validation checks"
-                
-                withCredentials([string(credentialsId: 'LOADBALANCER_SSH_PASSWORD', variable: 'LB_PASSWORD')]) {
-                    sh '''
-                        cd ansible
-                        
-                        echo "=== Nginx Status ==="
-                        ansible loadbalancer -i inventory -m shell \
-                            -a "nginx -t && systemctl is-active nginx" \
-                            --extra-vars "ansible_password=${LB_PASSWORD}"
-                        
-                        echo "=== Frontend Served ==="
-                        ansible loadbalancer -i inventory -m shell \
-                            -a "curl -sf -o /dev/null -w '%{http_code}' http://localhost/" \
-                            --extra-vars "ansible_password=${LB_PASSWORD}"
-                        
-                        echo "=== API Routing (optional) ==="
-                        ansible loadbalancer -i inventory -m shell \
-                            -a "curl -sf --max-time 5 -o /dev/null -w '%{http_code}' http://localhost/api/employees || echo 'Backend not deployed yet'" \
-                            --extra-vars "ansible_password=${LB_PASSWORD}"
-                    '''
-                }
+                sh """
+                    cd ansible
+                    
+                    echo "=== Nginx Status ==="
+                    ansible loadbalancer -i inventory -m shell \
+                        -a "nginx -t && systemctl is-active nginx"
+                    
+                    echo "=== Frontend Served ==="
+                    ansible loadbalancer -i inventory -m shell \
+                        -a "curl -sf -o /dev/null -w '%{http_code}' http://localhost/"
+                    
+                    echo "=== API Routing (optional) ==="
+                    ansible loadbalancer -i inventory -m shell \
+                        -a "curl -sf --max-time 5 -o /dev/null -w '%{http_code}' http://localhost/api/employees || echo 'Backend not deployed yet'"
+                """
                 echo "✅ All validation checks passed"
             }
         }
@@ -232,6 +218,15 @@ GENERATE_SOURCEMAP=false
         success {
             echo """
             ✅ Frontend CI/CD Pipeline Completed Successfully!
+            
+            📋 Deployment Summary:
+            ─────────────────────────────────────
+            Version: ${env.APP_VERSION}
+            Build Archive: frontend-build-${env.BUILD_NUMBER}.tar.gz
+            Load Balancer (Droplet 1): ✅
+            Frontend Served: ✅
+            API Routing: ✅
+            ─────────────────────────────────────
             """
         }
         

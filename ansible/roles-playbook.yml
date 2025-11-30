@@ -50,7 +50,7 @@
         state: present
 
 - name: Deploy Backend Services
-  hosts: backend
+  hosts: backends
   become: yes
   vars:
     # Application settings

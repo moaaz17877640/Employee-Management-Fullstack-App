@@ -47,6 +47,10 @@ pipeline {
         skipDefaultCheckout(true)
     }
     
+    parameters {
+        booleanParam(name: 'BUILD_DOCKER', defaultValue: false, description: 'Build Docker image (optional)')
+    }
+    
     stages {
         /**
          * Stage 1: Checkout Code
@@ -157,9 +161,12 @@ pipeline {
         }
         
         /**
-         * Stage 5: Build Docker Image
+         * Stage 5: Build Docker Image (Optional)
          */
         stage('Build Docker Image') {
+            when {
+                expression { params.BUILD_DOCKER == true }
+            }
             steps {
                 dir('backend') {
                     echo "🐳 Building Docker image..."

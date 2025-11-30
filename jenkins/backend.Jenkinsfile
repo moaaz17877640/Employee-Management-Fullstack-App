@@ -16,7 +16,7 @@
  * 6. Deploy to backend servers using Ansible
  * 7. Zero-downtime deploy (rolling restart)
  * 
- * Note: Uses SSH key authentication - add private key to Jenkins credentials as 'ssh-key'
+ * Note: Uses password authentication configured in ansible/inventory
  */
 
 pipeline {
@@ -77,9 +77,6 @@ pipeline {
                         mv Employee-Management-Fullstack-App-master/.* . 2>/dev/null || true
                         rmdir Employee-Management-Fullstack-App-master
                         rm repo.zip
-                        
-                        # Fix SSH key permissions
-                        chmod 400 Key.pem
                     '''
                 }
                 sh 'ls -la'
@@ -209,7 +206,6 @@ pipeline {
                 script {
                     // Verify server connectivity
                     sh """
-                        chmod 400 Key.pem
                         cd ansible
                         ansible droplet2 -i inventory -m ping --timeout=30
                     """
@@ -217,7 +213,6 @@ pipeline {
                     // Deploy to first backend server
                     echo "📦 Deploying JAR to Backend 1..."
                     sh """
-                        chmod 400 Key.pem
                         cd ansible
                         ansible-playbook -i inventory roles-playbook.yml \
                             --limit droplet2 \
@@ -233,7 +228,6 @@ pipeline {
                     // Health check for Backend 1
                     echo "🔍 Verifying Backend 1 is healthy..."
                     sh """
-                        chmod 400 Key.pem
                         cd ansible
                         ansible droplet2 -i inventory -m shell \
                             -a "curl -sf http://localhost:8080/api/employees || exit 1" \
@@ -251,7 +245,6 @@ pipeline {
                 script {
                     // Verify server connectivity
                     sh """
-                        chmod 400 Key.pem
                         cd ansible
                         ansible droplet3 -i inventory -m ping --timeout=30
                     """
@@ -259,7 +252,6 @@ pipeline {
                     // Deploy to second backend server
                     echo "📦 Deploying JAR to Backend 2..."
                     sh """
-                        chmod 400 Key.pem
                         cd ansible
                         ansible-playbook -i inventory roles-playbook.yml \
                             --limit droplet3 \
@@ -275,7 +267,6 @@ pipeline {
                     // Health check for Backend 2
                     echo "🔍 Verifying Backend 2 is healthy..."
                     sh """
-                        chmod 400 Key.pem
                         cd ansible
                         ansible droplet3 -i inventory -m shell \
                             -a "curl -sf http://localhost:8080/api/employees || exit 1" \
@@ -296,7 +287,6 @@ pipeline {
                 script {
                     echo "🔄 Reloading Nginx on Load Balancer..."
                     sh """
-                        chmod 400 Key.pem
                         cd ansible
                         ansible loadbalancer -i inventory -m shell \
                             -a "nginx -t && systemctl reload nginx" \
@@ -307,7 +297,6 @@ pipeline {
                     echo "🔍 Verifying API through Load Balancer..."
                     sleep(time: 5, unit: 'SECONDS')
                     sh """
-                        chmod 400 Key.pem
                         cd ansible
                         ansible loadbalancer -i inventory -m shell \
                             -a "curl -sf http://localhost/api/employees | head -20" \
@@ -325,7 +314,6 @@ pipeline {
                 echo "🏥 Running final validation checks"
                 
                 sh '''
-                    chmod 400 Key.pem
                     cd ansible
                     
                     echo "=== Backend 1 (Droplet 2) Health Check ==="

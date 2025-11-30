@@ -13,7 +13,7 @@
  * 3. Deploy to backend servers using Ansible
  * 4. Update load balancer configuration
  * 
- * Note: SSH passwords are stored in ansible/inventory file
+ * Note: Uses SSH key authentication - add private key to Jenkins credentials as 'ssh-key'
  */
 
 pipeline {
@@ -107,9 +107,6 @@ pipeline {
         stage('Deploy to Backend Servers') {
             steps {
                 echo "🚀 Deploying Spring Boot JAR to Backend servers (Droplets 2 & 3)"
-                
-                // Verify sshpass is installed
-                sh "which sshpass && echo '✅ sshpass is available'"
                 
                 script {
                     // Pre-deployment: Verify server connectivity

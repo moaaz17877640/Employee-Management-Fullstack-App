@@ -13,7 +13,7 @@
  * 3. Build React production bundle
  * 4. Deploy build files to Load Balancer server using Ansible
  * 
- * Note: SSH passwords are stored in ansible/inventory file
+ * Note: Uses SSH key authentication - add private key to Jenkins credentials as 'ssh-key'
  */
 
 pipeline {
@@ -153,9 +153,6 @@ GENERATE_SOURCEMAP=false
         stage('Deploy to Load Balancer') {
             steps {
                 echo "🚀 Deploying React build to Load Balancer server (Droplet 1)"
-                
-                // Verify sshpass is installed (should be pre-installed on Jenkins server)
-                sh "which sshpass && echo '✅ sshpass is available'"
                 
                 script {
                     // Pre-deployment: Verify server connectivity

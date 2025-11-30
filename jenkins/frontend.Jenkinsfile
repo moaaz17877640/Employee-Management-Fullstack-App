@@ -196,8 +196,8 @@ GENERATE_SOURCEMAP=false
                     sh """
                         chmod 400 Key.pem
                         cd ansible
-                        ansible loadbalancer -i inventory -m shell
-                            -a "curl -sf --max-time 5 http://localhost/api/employees || echo 'API not available yet - run backend pipeline first'"
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "curl -sf --max-time 5 http://localhost/api/employees || echo 'API not available yet - run backend pipeline first'" \
                             --timeout=30
                     """
                 }

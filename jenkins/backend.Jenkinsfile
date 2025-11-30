@@ -115,6 +115,7 @@ pipeline {
                     // Pre-deployment: Verify server connectivity
                     echo "🔍 Verifying backend server connectivity..."
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
                         ansible backends -i inventory -m ping --timeout=30
                     """
@@ -122,6 +123,7 @@ pipeline {
                     // Deploy backend using Ansible playbook
                     echo "📦 Deploying backend JAR files..."
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
                         ansible-playbook -i inventory roles-playbook.yml \
                             --limit backends \
@@ -136,6 +138,7 @@ pipeline {
                     // Verify backend is running on each server
                     echo "🔍 Verifying backend deployment on each server..."
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
                         ansible backends -i inventory -m shell \
                             -a "curl -sf http://localhost:8080/api/employees || echo 'Waiting for Spring Boot...'" \
@@ -156,6 +159,7 @@ pipeline {
                 script {
                     echo "🔄 Reloading Nginx on Load Balancer..."
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
                         ansible loadbalancer -i inventory -m shell \
                             -a "nginx -t && systemctl reload nginx" \
@@ -166,6 +170,7 @@ pipeline {
                     echo "🔍 Verifying API through Load Balancer..."
                     sleep(time: 5, unit: 'SECONDS')
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
                         ansible loadbalancer -i inventory -m shell \
                             -a "curl -sf http://localhost/api/employees | head -20" \
@@ -183,6 +188,7 @@ pipeline {
                 echo "🏥 Running final validation checks"
                 
                 sh '''
+                    chmod 400 Key.pem
                     cd ansible
                     
                     echo "=== Backend 1 (Droplet 2) Health Check ==="

@@ -161,6 +161,7 @@ GENERATE_SOURCEMAP=false
                     // Pre-deployment: Verify server connectivity
                     echo "🔍 Verifying server connectivity..."
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
                         ansible loadbalancer -i inventory -m ping --timeout=30
                     """
@@ -168,6 +169,7 @@ GENERATE_SOURCEMAP=false
                     // Deploy frontend using Ansible playbook
                     echo "📦 Deploying frontend build files..."
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
                         ansible-playbook -i inventory roles-playbook.yml \
                             --limit loadbalancer \
@@ -182,6 +184,7 @@ GENERATE_SOURCEMAP=false
                     // Verify frontend is served correctly
                     echo "🔍 Verifying frontend deployment..."
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
                         ansible loadbalancer -i inventory -m shell \
                             -a "curl -sf http://localhost/ | head -20" \
@@ -191,9 +194,10 @@ GENERATE_SOURCEMAP=false
                     // Verify API routing through Nginx (optional - backend may not be deployed yet)
                     echo "🔗 Checking API routing (optional - backend may not be deployed)..."
                     sh """
+                        chmod 400 Key.pem
                         cd ansible
-                        ansible loadbalancer -i inventory -m shell \
-                            -a "curl -sf --max-time 5 http://localhost/api/employees || echo 'API not available yet - run backend pipeline first'" \
+                        ansible loadbalancer -i inventory -m shell
+                            -a "curl -sf --max-time 5 http://localhost/api/employees || echo 'API not available yet - run backend pipeline first'"
                             --timeout=30
                     """
                 }
@@ -207,6 +211,7 @@ GENERATE_SOURCEMAP=false
             steps {
                 echo "🏥 Running final validation checks"
                 sh """
+                    chmod 400 Key.pem
                     cd ansible
                     
                     echo "=== Nginx Status ==="

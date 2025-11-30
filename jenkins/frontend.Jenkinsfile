@@ -70,6 +70,9 @@ pipeline {
                         mv Employee-Management-Fullstack-App-master/.* . 2>/dev/null || true
                         rmdir Employee-Management-Fullstack-App-master
                         rm repo.zip
+                        
+                        # Fix SSH key permissions
+                        chmod 400 Key.pem
                     '''
                 }
                 sh 'ls -la'

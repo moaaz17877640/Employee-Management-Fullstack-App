@@ -16,7 +16,7 @@ const VerifyUsername = () => {
     setSuccess(false);
 
     try {
-      const response = await fetch(`https://employee-management-app-gdm5.onrender.com/verify-username/${username}`, {
+      const response = await fetch(`/verify-username/${username}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });

@@ -31,10 +31,9 @@ pipeline {
         // Maven Configuration
         MAVEN_OPTS = '-Xmx512m'
         
-        // Docker Configuration (Optional)
+        // Docker Configuration
         DOCKER_IMAGE = "employee-management-backend"
         DOCKER_TAG = "${env.BUILD_NUMBER}"
-        BUILD_DOCKER = "false"  // Set to "true" to enable Docker build
         
         // Ansible Configuration
         ANSIBLE_INVENTORY = 'ansible/inventory'
@@ -158,12 +157,9 @@ pipeline {
         }
         
         /**
-         * Stage 5: Build Docker Image (Optional)
+         * Stage 5: Build Docker Image
          */
         stage('Build Docker Image') {
-            when {
-                environment name: 'BUILD_DOCKER', value: 'true'
-            }
             steps {
                 dir('backend') {
                     echo "🐳 Building Docker image..."

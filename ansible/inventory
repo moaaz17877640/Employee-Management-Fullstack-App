@@ -15,7 +15,7 @@ droplet3 ansible_host=54.160.160.202 ansible_user=ubuntu
 [all:vars]
 # Global variables
 ansible_python_interpreter=/usr/bin/python3
-ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ConnectTimeout=90 -o ConnectionAttempts=3'
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ConnectTimeout=90 -o ConnectionAttempts=3 -i ../Key.pem'
 ansible_timeout=100
 # SSH Key authentication settings
 ansible_connection=ssh

@@ -203,37 +203,42 @@ pipeline {
             steps {
                 echo "🚀 Deploying to Backend Server 1 (Droplet 2) - Rolling deployment"
                 
-                script {
-                    // Verify server connectivity
-                    sh """
-                        cd ansible
-                        ansible droplet2 -i inventory -m ping --timeout=30
-                    """
-                    
-                    // Deploy to first backend server
-                    echo "📦 Deploying JAR to Backend 1..."
-                    sh """
-                        cd ansible
-                        ansible-playbook -i inventory roles-playbook.yml \
-                            --limit droplet2 \
-                            --extra-vars "app_version=${env.APP_VERSION}" \
-                            --extra-vars "build_number=${env.BUILD_NUMBER}" \
-                            -v
-                    """
-                    
-                    // Wait for Spring Boot to start
-                    echo "⏳ Waiting for Backend 1 to start..."
-                    sleep(time: 30, unit: 'SECONDS')
-                    
-                    // Health check for Backend 1
-                    echo "🔍 Verifying Backend 1 is healthy..."
-                    sh """
-                        cd ansible
-                        ansible droplet2 -i inventory -m shell \
-                            -a "curl -sf http://localhost:8080/api/employees || exit 1" \
-                            --timeout=60
-                    """
-                    echo "✅ Backend 1 deployed and healthy"
+                withCredentials([string(credentialsId: 'droplet2-password', variable: 'DROPLET2_PASSWORD')]) {
+                    script {
+                        // Verify server connectivity
+                        sh '''
+                            cd ansible
+                            ansible droplet2 -i inventory -m ping --timeout=30 \
+                                --extra-vars "ansible_password=${DROPLET2_PASSWORD}"
+                        '''
+                        
+                        // Deploy to first backend server
+                        echo "📦 Deploying JAR to Backend 1..."
+                        sh """
+                            cd ansible
+                            ansible-playbook -i inventory roles-playbook.yml \
+                                --limit droplet2 \
+                                --extra-vars "app_version=${env.APP_VERSION}" \
+                                --extra-vars "build_number=${env.BUILD_NUMBER}" \
+                                --extra-vars "ansible_password=${DROPLET2_PASSWORD}" \
+                                -v
+                        """
+                        
+                        // Wait for Spring Boot to start
+                        echo "⏳ Waiting for Backend 1 to start..."
+                        sleep(time: 30, unit: 'SECONDS')
+                        
+                        // Health check for Backend 1
+                        echo "🔍 Verifying Backend 1 is healthy..."
+                        sh '''
+                            cd ansible
+                            ansible droplet2 -i inventory -m shell \
+                                -a "curl -sf http://localhost:8080/api/employees || exit 1" \
+                                --extra-vars "ansible_password=${DROPLET2_PASSWORD}" \
+                                --timeout=60
+                        '''
+                        echo "✅ Backend 1 deployed and healthy"
+                    }
                 }
             }
         }
@@ -242,37 +247,42 @@ pipeline {
             steps {
                 echo "🚀 Deploying to Backend Server 2 (Droplet 3) - Rolling deployment"
                 
-                script {
-                    // Verify server connectivity
-                    sh """
-                        cd ansible
-                        ansible droplet3 -i inventory -m ping --timeout=30
-                    """
-                    
-                    // Deploy to second backend server
-                    echo "📦 Deploying JAR to Backend 2..."
-                    sh """
-                        cd ansible
-                        ansible-playbook -i inventory roles-playbook.yml \
-                            --limit droplet3 \
-                            --extra-vars "app_version=${env.APP_VERSION}" \
-                            --extra-vars "build_number=${env.BUILD_NUMBER}" \
-                            -v
-                    """
-                    
-                    // Wait for Spring Boot to start
-                    echo "⏳ Waiting for Backend 2 to start..."
-                    sleep(time: 30, unit: 'SECONDS')
-                    
-                    // Health check for Backend 2
-                    echo "🔍 Verifying Backend 2 is healthy..."
-                    sh """
-                        cd ansible
-                        ansible droplet3 -i inventory -m shell \
-                            -a "curl -sf http://localhost:8080/api/employees || exit 1" \
-                            --timeout=60
-                    """
-                    echo "✅ Backend 2 deployed and healthy"
+                withCredentials([string(credentialsId: 'droplet3-password', variable: 'DROPLET3_PASSWORD')]) {
+                    script {
+                        // Verify server connectivity
+                        sh '''
+                            cd ansible
+                            ansible droplet3 -i inventory -m ping --timeout=30 \
+                                --extra-vars "ansible_password=${DROPLET3_PASSWORD}"
+                        '''
+                        
+                        // Deploy to second backend server
+                        echo "📦 Deploying JAR to Backend 2..."
+                        sh """
+                            cd ansible
+                            ansible-playbook -i inventory roles-playbook.yml \
+                                --limit droplet3 \
+                                --extra-vars "app_version=${env.APP_VERSION}" \
+                                --extra-vars "build_number=${env.BUILD_NUMBER}" \
+                                --extra-vars "ansible_password=${DROPLET3_PASSWORD}" \
+                                -v
+                        """
+                        
+                        // Wait for Spring Boot to start
+                        echo "⏳ Waiting for Backend 2 to start..."
+                        sleep(time: 30, unit: 'SECONDS')
+                        
+                        // Health check for Backend 2
+                        echo "🔍 Verifying Backend 2 is healthy..."
+                        sh '''
+                            cd ansible
+                            ansible droplet3 -i inventory -m shell \
+                                -a "curl -sf http://localhost:8080/api/employees || exit 1" \
+                                --extra-vars "ansible_password=${DROPLET3_PASSWORD}" \
+                                --timeout=60
+                        '''
+                        echo "✅ Backend 2 deployed and healthy"
+                    }
                 }
             }
         }
@@ -284,24 +294,28 @@ pipeline {
             steps {
                 echo "🔄 Updating Load Balancer Nginx configuration"
                 
-                script {
-                    echo "🔄 Reloading Nginx on Load Balancer..."
-                    sh """
-                        cd ansible
-                        ansible loadbalancer -i inventory -m shell \
-                            -a "nginx -t && systemctl reload nginx" \
-                            --timeout=30
-                    """
-                    
-                    // Verify API is accessible through Load Balancer
-                    echo "🔍 Verifying API through Load Balancer..."
-                    sleep(time: 5, unit: 'SECONDS')
-                    sh """
-                        cd ansible
-                        ansible loadbalancer -i inventory -m shell \
-                            -a "curl -sf http://localhost/api/employees | head -20" \
-                            --timeout=30
-                    """
+                withCredentials([string(credentialsId: 'droplet1-password', variable: 'DROPLET1_PASSWORD')]) {
+                    script {
+                        echo "🔄 Reloading Nginx on Load Balancer..."
+                        sh '''
+                            cd ansible
+                            ansible loadbalancer -i inventory -m shell \
+                                -a "nginx -t && systemctl reload nginx" \
+                                --extra-vars "ansible_password=${DROPLET1_PASSWORD}" \
+                                --timeout=30
+                        '''
+                        
+                        // Verify API is accessible through Load Balancer
+                        echo "🔍 Verifying API through Load Balancer..."
+                        sleep(time: 5, unit: 'SECONDS')
+                        sh '''
+                            cd ansible
+                            ansible loadbalancer -i inventory -m shell \
+                                -a "curl -sf http://localhost/api/employees | head -20" \
+                                --extra-vars "ansible_password=${DROPLET1_PASSWORD}" \
+                                --timeout=30
+                        '''
+                    }
                 }
             }
         }
@@ -313,24 +327,33 @@ pipeline {
             steps {
                 echo "🏥 Running final validation checks"
                 
-                sh '''
-                    cd ansible
-                    
-                    echo "=== Backend 1 (Droplet 2) Health Check ==="
-                    ansible droplet2 -i inventory -m shell \
-                        -a "curl -sf http://localhost:8080/api/employees | head -5" \
-                        --timeout=30 || true
-                    
-                    echo "=== Backend 2 (Droplet 3) Health Check ==="
-                    ansible droplet3 -i inventory -m shell \
-                        -a "curl -sf http://localhost:8080/api/employees | head -5" \
-                        --timeout=30 || true
-                    
-                    echo "=== Load Balancer API Routing ==="
-                    ansible loadbalancer -i inventory -m shell \
-                        -a "curl -sf http://localhost/api/employees | head -5" \
-                        --timeout=30 || true
-                '''
+                withCredentials([
+                    string(credentialsId: 'droplet1-password', variable: 'DROPLET1_PASSWORD'),
+                    string(credentialsId: 'droplet2-password', variable: 'DROPLET2_PASSWORD'),
+                    string(credentialsId: 'droplet3-password', variable: 'DROPLET3_PASSWORD')
+                ]) {
+                    sh '''
+                        cd ansible
+                        
+                        echo "=== Backend 1 (Droplet 2) Health Check ==="
+                        ansible droplet2 -i inventory -m shell \
+                            -a "curl -sf http://localhost:8080/api/employees | head -5" \
+                            --extra-vars "ansible_password=${DROPLET2_PASSWORD}" \
+                            --timeout=30 || true
+                        
+                        echo "=== Backend 2 (Droplet 3) Health Check ==="
+                        ansible droplet3 -i inventory -m shell \
+                            -a "curl -sf http://localhost:8080/api/employees | head -5" \
+                            --extra-vars "ansible_password=${DROPLET3_PASSWORD}" \
+                            --timeout=30 || true
+                        
+                        echo "=== Load Balancer API Routing ==="
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "curl -sf http://localhost/api/employees | head -5" \
+                            --extra-vars "ansible_password=${DROPLET1_PASSWORD}" \
+                            --timeout=30 || true
+                    '''
+                }
                 
                 echo "✅ All validation checks passed"
             }

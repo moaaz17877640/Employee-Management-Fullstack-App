@@ -154,45 +154,51 @@ GENERATE_SOURCEMAP=false
             steps {
                 echo "🚀 Deploying React build to Load Balancer server (Droplet 1)"
                 
-                script {
-                    // Pre-deployment: Verify server connectivity
-                    echo "🔍 Verifying server connectivity..."
-                    sh """
-                        cd ansible
-                        ansible loadbalancer -i inventory -m ping --timeout=30
-                    """
-                    
-                    // Deploy frontend using Ansible playbook
-                    echo "📦 Deploying frontend build files..."
-                    sh """
-                        cd ansible
-                        ansible-playbook -i inventory roles-playbook.yml \
-                            --limit loadbalancer \
-                            --extra-vars "app_version=${env.APP_VERSION}" \
-                            --extra-vars "build_number=${env.BUILD_NUMBER}" \
-                            -v
-                    """
-                    
-                    // Wait for Nginx to reload
-                    sleep(time: 10, unit: 'SECONDS')
-                    
-                    // Verify frontend is served correctly
-                    echo "🔍 Verifying frontend deployment..."
-                    sh """
-                        cd ansible
-                        ansible loadbalancer -i inventory -m shell \
-                            -a "curl -sf http://localhost/ | head -20" \
-                            --timeout=60
-                    """
-                    
-                    // Verify API routing through Nginx (optional - backend may not be deployed yet)
-                    echo "🔗 Checking API routing (optional - backend may not be deployed)..."
-                    sh """
-                        cd ansible
-                        ansible loadbalancer -i inventory -m shell \
-                            -a "curl -sf --max-time 5 http://localhost/api/employees || echo 'API not available yet - run backend pipeline first'" \
-                            --timeout=30
-                    """
+                withCredentials([string(credentialsId: 'droplet1-password', variable: 'DROPLET1_PASSWORD')]) {
+                    script {
+                        // Pre-deployment: Verify server connectivity
+                        echo "🔍 Verifying server connectivity..."
+                        sh '''
+                            cd ansible
+                            ansible loadbalancer -i inventory -m ping --timeout=30 \
+                                --extra-vars "ansible_password=${DROPLET1_PASSWORD}"
+                        '''
+                        
+                        // Deploy frontend using Ansible playbook
+                        echo "📦 Deploying frontend build files..."
+                        sh """
+                            cd ansible
+                            ansible-playbook -i inventory roles-playbook.yml \
+                                --limit loadbalancer \
+                                --extra-vars "app_version=${env.APP_VERSION}" \
+                                --extra-vars "build_number=${env.BUILD_NUMBER}" \
+                                --extra-vars "ansible_password=${DROPLET1_PASSWORD}" \
+                                -v
+                        """
+                        
+                        // Wait for Nginx to reload
+                        sleep(time: 10, unit: 'SECONDS')
+                        
+                        // Verify frontend is served correctly
+                        echo "🔍 Verifying frontend deployment..."
+                        sh '''
+                            cd ansible
+                            ansible loadbalancer -i inventory -m shell \
+                                -a "curl -sf http://localhost/ | head -20" \
+                                --extra-vars "ansible_password=${DROPLET1_PASSWORD}" \
+                                --timeout=60
+                        '''
+                        
+                        // Verify API routing through Nginx (optional - backend may not be deployed yet)
+                        echo "🔗 Checking API routing (optional - backend may not be deployed)..."
+                        sh '''
+                            cd ansible
+                            ansible loadbalancer -i inventory -m shell \
+                                -a "curl -sf --max-time 5 http://localhost/api/employees || echo 'API not available yet - run backend pipeline first'" \
+                                --extra-vars "ansible_password=${DROPLET1_PASSWORD}" \
+                                --timeout=30
+                        '''
+                    }
                 }
             }
         }
@@ -203,21 +209,27 @@ GENERATE_SOURCEMAP=false
         stage('Final Validation') {
             steps {
                 echo "🏥 Running final validation checks"
-                sh """
-                    cd ansible
-                    
-                    echo "=== Nginx Status ==="
-                    ansible loadbalancer -i inventory -m shell \
-                        -a "nginx -t && systemctl is-active nginx"
-                    
-                    echo "=== Frontend Served ==="
-                    ansible loadbalancer -i inventory -m shell \
-                        -a "curl -sf -o /dev/null -w '%{http_code}' http://localhost/"
-                    
-                    echo "=== API Routing (optional) ==="
-                    ansible loadbalancer -i inventory -m shell \
-                        -a "curl -sf --max-time 5 -o /dev/null -w '%{http_code}' http://localhost/api/employees || echo 'Backend not deployed yet'"
-                """
+                
+                withCredentials([string(credentialsId: 'droplet1-password', variable: 'DROPLET1_PASSWORD')]) {
+                    sh '''
+                        cd ansible
+                        
+                        echo "=== Nginx Status ==="
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "nginx -t && systemctl is-active nginx" \
+                            --extra-vars "ansible_password=${DROPLET1_PASSWORD}"
+                        
+                        echo "=== Frontend Served ==="
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "curl -sf -o /dev/null -w '%{http_code}' http://localhost/" \
+                            --extra-vars "ansible_password=${DROPLET1_PASSWORD}"
+                        
+                        echo "=== API Routing (optional) ==="
+                        ansible loadbalancer -i inventory -m shell \
+                            -a "curl -sf --max-time 5 -o /dev/null -w '%{http_code}' http://localhost/api/employees || echo 'Backend not deployed yet'" \
+                            --extra-vars "ansible_password=${DROPLET1_PASSWORD}"
+                    '''
+                }
                 echo "✅ All validation checks passed"
             }
         }

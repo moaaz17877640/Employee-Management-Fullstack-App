@@ -1,15 +1,13 @@
 # Ansible Inventory for Employee Management App - Madaar Solutions
 # AWS EC2 / DigitalOcean Droplet Configuration
-# Using Password Authentication
+# Using Password Authentication (injected via Jenkins)
 
 [loadbalancer]
 # Droplet 1 - Load Balancer + Frontend
-# Password retrieved from Jenkins credentials via extra-vars
 droplet1 ansible_host=165.232.112.136 ansible_user=root
 
 [backends]
 # Droplet 2 - Backend Instance #1
-# Password retrieved from Jenkins credentials via extra-vars
 droplet2 ansible_host=138.68.90.46 ansible_user=root
 # Droplet 3 - Backend Instance #2  
 droplet3 ansible_host=206.189.61.18 ansible_user=root
@@ -43,11 +41,11 @@ mysql_database=employee_management
 mysql_user=empapp
 mysql_password=emppass123
 
-# SSL/Domain configuration (Commented out - no domain available)
-# domain_name=emp-mgmt.yourdomain.com
-# ssl_email=admin@yourdomain.com  
-# ssl_type=letsencrypt
-enable_ssl=false
+# SSL/Domain configuration
+domain_name=employeemanagement.systems
+ssl_email=mstfyrb477@gmail.com
+ssl_type=letsencrypt
+enable_ssl=true
 health_check_interval=30
 
 

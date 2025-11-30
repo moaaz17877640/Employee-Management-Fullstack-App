@@ -163,12 +163,29 @@ pipeline {
             steps {
                 dir('backend') {
                     echo "🐳 Building Docker image..."
+                    sh '''
+                        # Check if Docker is installed
+                        if ! command -v docker &> /dev/null; then
+                            echo "⚠️ Docker not found. Installing Docker..."
+                            sudo apt-get update
+                            sudo apt-get install -y docker.io
+                            sudo systemctl start docker
+                            sudo systemctl enable docker
+                            sudo usermod -aG docker jenkins || true
+                            echo "✅ Docker installed successfully"
+                        fi
+                        
+                        # Verify Docker is running
+                        docker --version
+                    '''
+                    
                     sh """
-                        docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+                        # Build Docker image
+                        sudo docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                        sudo docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
                         
                         echo "✅ Docker image built: ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                        docker images | grep ${DOCKER_IMAGE}
+                        sudo docker images | grep ${DOCKER_IMAGE}
                     """
                 }
             }
